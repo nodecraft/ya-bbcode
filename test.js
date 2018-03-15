@@ -1,5 +1,5 @@
 'use strict';
-let yabbc = require('./ya-bbc.js');
+let yabbc = require('./ya-bbcode.js');
 
 let bbc = `[img]http://i.imgur.com/ZBm6hbZ.png[/img][b]more[/b]
 
