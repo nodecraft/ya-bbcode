@@ -1,5 +1,6 @@
-# ya-bbcode.js
+# ya-bbcode
 Yet another BBCode parser.
+`npm install ya-bbcode --save`
 
 ## Usage
 
