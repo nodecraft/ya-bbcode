@@ -1,6 +1,6 @@
 {
   "name": "ya-bbcode",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Yet another BBCode Parser",
   "main": "ya-bbc.js",
   "scripts": {
@@ -10,6 +10,14 @@
   "engines": {
     "node": ">=8.9.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nodecraft/ya-bbcode"
+  },
+  "homepage": "https://github.com/nodecraft/ya-bbcode",
+  "bugs": {
+    "url": "https://github.com/nodecraft/ya-bbcode/issues"
+  },
   "keywords": [
     "bbc",
     "bbcode",
@@ -18,9 +26,7 @@
   ],
   "author": "Nodecraft Hosting LLC",
   "license": "MIT",
-  "dependencies": {
-    "lodash": "^4.17.5"
-  },
+  "dependencies": {},
   "devDependencies": {
     "eslint": "^4.18.2",
     "eslint-config-nodecraft": "^1.0.11",
