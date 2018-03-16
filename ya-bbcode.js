@@ -1,8 +1,8 @@
 'use strict';
 
-const yabbc = function(config = {}){
-	if(!(this instanceof yabbc)){
-		return new yabbc();
+const yabbcode = function(config = {}){
+	if(!(this instanceof yabbcode)){
+		return new yabbcode();
 	}
 	let self = this;
 	this.config = {
@@ -172,7 +172,7 @@ const yabbc = function(config = {}){
 		tags: /(\[[^\]^\s]{1,}\])/g
 	};
 };
-yabbc.prototype._ignoreLoop = function(tagsMap, content){
+yabbcode.prototype._ignoreLoop = function(tagsMap, content){
 	tagsMap.forEach((tag) => {
 		content = content.replace('[TAG-' + tag.index + ']', tag.raw);
 		if(tag.closing){
@@ -185,7 +185,7 @@ yabbc.prototype._ignoreLoop = function(tagsMap, content){
 	return content;
 };
 
-yabbc.prototype._contentLoop = function(tagsMap, content){
+yabbcode.prototype._contentLoop = function(tagsMap, content){
 	tagsMap.forEach((tag) => {
 		let module = this.tags[tag.module];
 		if(!module){
@@ -208,7 +208,7 @@ yabbc.prototype._contentLoop = function(tagsMap, content){
 	return content;
 };
 
-yabbc.prototype._tagLoop = function(tagsMap, parent){
+yabbcode.prototype._tagLoop = function(tagsMap, parent){
 	let currentTagIndex = 0;
 	while(currentTagIndex < tagsMap.length){
 		let found = false;
@@ -267,17 +267,17 @@ yabbc.prototype._tagLoop = function(tagsMap, parent){
 	});
 };
 
-yabbc.prototype.clearTags = function(){
+yabbcode.prototype.clearTags = function(){
 	this.tags = {};
 	return this;
 };
 
-yabbc.prototype.registerTag = function(tag, options){
+yabbcode.prototype.registerTag = function(tag, options){
 	this.tags[String(tag).toLowerCase()] = options;
 	return this;
 };
 
-yabbc.prototype.parse = function(bbcInput){
+yabbcode.prototype.parse = function(bbcInput){
 	let input = bbcInput.slice(0); // cheap string clone
 
 	// reset
@@ -315,4 +315,4 @@ yabbc.prototype.parse = function(bbcInput){
 	return input;
 };
 
-module.exports = yabbc;
+module.exports = yabbcode;
