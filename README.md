@@ -7,32 +7,27 @@ Yet another BBCode parser.
 ## Usage
 
 ```javascript
+let yabbcode = require('ya-bbcode');
+let parser = new yabbcode();
 
-	let yabbcode = require('ya-bbcode');
-	let parser = new yabbcode();
-	
-	let bbc = '[url=https://nodecraft.com]Visit Nodecraft[/url]';
-
-	parser.parse(bbc);
-	// <a href="https://nodecraft.com">Visit Nodecraft</a>
-
+let bbc = '[url=https://nodecraft.com]Visit Nodecraft[/url]';
+parser.parse(bbc);
+// <a href="https://nodecraft.com">Visit Nodecraft</a>
 ```
 
 ##### Add Custom Tags
 
 ```javascript
-	parser.registerTag('url', {
-		type: 'replace',
-		open: (attr) => {
-			return `<a href="${attr || '#'}" rel="noopener norefer">`;
-		},
-		close: '</a>'
-	});
+parser.registerTag('url', {
+	type: 'replace',
+	open: (attr) => {
+		return `<a href="${attr || '#'}" rel="noopener norefer">`;
+	},
+	close: '</a>'
+});
 
-
-	// Remove all default or registered tags
-	parser.clearTags();
-
+// Remove all default or registered tags
+parser.clearTags();
 ```
 
 ### Why another BBCode Parser?
