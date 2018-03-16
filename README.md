@@ -2,6 +2,8 @@
 Yet another BBCode parser.
 `npm install ya-bbcode --save`
 
+[![Build Status](https://travis-ci.org/nodecraft/ya-bbcode.svg?branch=master)](https://travis-ci.org/nodecraft/ya-bbcode)
+
 ## Usage
 
 ```javascript
