@@ -284,6 +284,11 @@ yabbcode.prototype.parse = function(bbcInput){
 	let tagsMap = [];
 	// split input into tags by index
 	let tags = String(input).match(this.regex.tags);
+
+	// handle when no tags are present
+	if(!tags || !tags.length){
+		return input;
+	}
 	tags.forEach((tag, i) => {
 		let parts = tag.slice(1, -1).split('=');
 		let item = {
