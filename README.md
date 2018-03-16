@@ -43,4 +43,3 @@ Yet another BBCode parser.
  - Performance improvements
  - Clean code up for improved readability
  - Improve docs
- - Add unit tests
