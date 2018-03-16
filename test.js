@@ -1,6 +1,6 @@
 'use strict';
-const ava = require('ava'),
-	yabbc = require('./ya-bbcode.js');
+const ava = require('ava');
+const yabbc = require('./ya-bbcode.js');
 
 let bbcodes = {
 	'none': 'Nodecraft Game servers',
