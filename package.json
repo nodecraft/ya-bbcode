@@ -1,6 +1,6 @@
 {
   "name": "ya-bbcode",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Yet another BBCode Parser",
   "main": "ya-bbcode.js",
   "scripts": {

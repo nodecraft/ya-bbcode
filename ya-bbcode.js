@@ -6,10 +6,14 @@ const yabbcode = function(config = {}){
 	}
 	let self = this;
 	this.config = {
-		newline: true
+		newline: true,
+		cleanUnmatchable: true
 	};
 	if(config.newline !== undefined){
 		this.config = config.newline;
+	}
+	if(config.cleanUnmatchable !== undefined){
+		this.config = config.cleanUnmatchable;
 	}
 
 	this.tags = {
@@ -40,7 +44,7 @@ const yabbcode = function(config = {}){
 		'i': {
 			type: 'replace',
 			open: '<i>',
-			close: '</u>'
+			close: '</i>'
 		},
 		'h1': {
 			type: 'replace',
@@ -105,6 +109,9 @@ const yabbcode = function(config = {}){
 		'img': {
 			type: 'content',
 			replace: (attr, content) => {
+				if(!content){
+					return '';
+				}
 				return `<img src="${content}" alt="${attr || ''}"/>`;
 			}
 		},
@@ -158,9 +165,7 @@ const yabbcode = function(config = {}){
 				end = content.indexOf(closeTag);
 
 			let innerContent = content.substr(start + openTag.length, end - (start + openTag.length));
-
 			innerContent = self._ignoreLoop(tag.children, innerContent);
-
 			let contentStart = content.substr(0, start),
 				contentEnd = content.substr(end + closeTag.length);
 
@@ -169,7 +174,9 @@ const yabbcode = function(config = {}){
 	};
 
 	this.regex = {
-		tags: /(\[[^\]^\s]{1,}\])/g
+		tags: /(\[[^\]^\s]{1,}\])/g,
+		newline: /(?:\r\n|\r|\n)/g,
+		placeholders: /\[TAG-[1-9]{1,}\]/g
 	};
 };
 yabbcode.prototype._ignoreLoop = function(tagsMap, content){
@@ -200,7 +207,7 @@ yabbcode.prototype._contentLoop = function(tagsMap, content){
 			throw new Error("Cannot parse content block. Invalid block type [" + module.type + "] provided for tag [" + tag.module + "]");
 		}
 		content = this.contentModules[module.type](tag, module, content);
-		if(tag.children.length && tag.module !== 'ignore'){
+		if(tag.children.length && module.type !== 'ignore'){
 			content = this._contentLoop(tag.children, content);
 		}
 	});
@@ -278,8 +285,8 @@ yabbcode.prototype.registerTag = function(tag, options){
 };
 
 yabbcode.prototype.parse = function(bbcInput){
-	let input = bbcInput.slice(0); // cheap string clone
-
+	if(typeof(bbcInput) === 'boolean' || typeof(bbcInput) !== 'string' && isNaN(bbcInput)){ return ''; }
+	let input = String(bbcInput).slice(0); // cheap string clone
 	// reset
 	let tagsMap = [];
 	// split input into tags by index
@@ -312,10 +319,12 @@ yabbcode.prototype.parse = function(bbcInput){
 	// loop through each tag to create nested elements
 	tagsMap = this._tagLoop(tagsMap);
 	// put back all non-found matches?
-
 	input = this._contentLoop(tagsMap, input);
 	if(this.config.newline){
-		input = input.replace(/(?:\r\n|\r|\n)/g, "<br/>");
+		input = input.replace(this.regex.newline, "<br/>");
+	}
+	if(this.config.cleanUnmatchable){
+		input = input.replace(this.regex.placeholders, '');
 	}
 	return input;
 };
