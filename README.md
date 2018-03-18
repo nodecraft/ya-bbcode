@@ -2,7 +2,7 @@
 Yet another BBCode parser.
 `npm install ya-bbcode --save`
 
-[![Build Status](https://travis-ci.org/nodecraft/ya-bbcode.svg?branch=master)](https://travis-ci.org/nodecraft/ya-bbcode)
+[![Build Status](https://travis-ci.org/nodecraft/ya-bbcode.svg?branch=master)](https://travis-ci.org/nodecraft/ya-bbcode) [![npm](https://img.shields.io/npm/v/ya-bbcode.svg)](https://www.npmjs.com/package/ya-bbcode)
 
 ## Usage
 
