@@ -6,10 +6,12 @@ let bbcodes = {
 	'none': 'Nodecraft Game servers',
 	'invalid': '[Nodecraft]Game servers[/nodecraft]',
 	'unclosed': '[strong]Nodecraft [b]Game servers[/b]',
+	'unmatchable': '[b]Game Servers Done Right![img][/b]',
 	'ordering': '[quote=[b]text[/b][/quote]',
 	'nested': '[url=https://nodecraft.com][img]https://nodecraft.com/assets/images/logo.png[/img][/url]',
 	'nested_deep': '[url=https://nodecraft.com][b]Game Servers [u][i]Done Right[/i][/u][/b][/url]',
 	'url': '[url=https://nodecraft.com]Visit Nodecraft[/url]',
+	'url_no_attr': '[url]Visit Nodecraft[/url]',
 	'quote': '[quote=Nodecraft]Game Servers Done Right![/quote]',
 	'quote_no_attr': '[quote]Game Servers Done Right![/quote]',
 	'b': '[b]Game Servers Done Right![/b]',
@@ -29,9 +31,16 @@ let bbcodes = {
 	'img': '[img=Nodecraft]https://nodecraft.com/assets/images/logo.png[/img]',
 	'img_no_attr': '[img]https://nodecraft.com/assets/images/logo.png[/img]',
 	'img_invalid': '[img][/img]',
-	'noparse': '[noparse][img]https://nodecraft.com/assets/images/logo.png[/img][/noparse]'
+	'noparse': '[noparse][img]https://nodecraft.com/assets/images/logo.png[/img][/noparse]',
+	'noparse_nested': '[noparse][url=https://nodecraft.com][img]https://nodecraft.com/assets/images/logo.png[/img][/url][/noparse]',
+	'noparse_unclosed': '[noparse][img]https://nodecraft.com/assets/images/logo.png[/img]'
 };
+let newlineTest = `[h1]Nodecraft[/h1]
+[b]Game Servers Done Right[/b]`;
 
+ava.test('Bad yabbc instance', (t) => {
+	t.is(yabbc().parse(bbcodes.none), bbcodes.none);
+});
 ava.test('No BBCode', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.none), bbcodes.none);
@@ -62,10 +71,10 @@ ava.test('Non string input', (t) => {
 	t.is(parser.parse(1.0), '1');
 	t.is(parser.parse(12), '12');
 });
-
 ava.test('Tag: url', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.url), '<a href="https://nodecraft.com">Visit Nodecraft</a>');
+	t.is(parser.parse(bbcodes.url_no_attr), '<a href="#">Visit Nodecraft</a>');
 });
 ava.test('Tag: quote', (t) => {
 	let parser = new yabbc();
@@ -123,7 +132,10 @@ ava.test('Tag: noparse', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.noparse), '[img]https://nodecraft.com/assets/images/logo.png[/img]');
 });
-
+ava.test('Tag: noparse nested', (t) => {
+	let parser = new yabbc();
+	t.is(parser.parse(bbcodes.noparse_nested), '[url=https://nodecraft.com][img]https://nodecraft.com/assets/images/logo.png[/img][/url]');
+});
 ava.test('Custom Tag', (t) => {
 	let parser = new yabbc();
 	parser.registerTag('url', {
@@ -131,7 +143,46 @@ ava.test('Custom Tag', (t) => {
 		open: (attr) => {
 			return `<a href="${attr || '#'}" rel="noopener nofollow" target="_blank">`;
 		},
-		close: '</a>'
+		close: () => {
+			return '</a>';
+		}
 	});
 	t.is(parser.parse(bbcodes.url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
+});
+ava.test('Custom Tag: Invalid Type', (t) => {
+	let parser = new yabbc();
+	parser.registerTag('url', {
+		type: 'expand',
+		open: (attr) => {
+			return `<a href="${attr || '#'}" rel="noopener nofollow" target="_blank">`;
+		},
+		close: () => {
+			return '</a>';
+		}
+	});
+	let error = t.throws(() => {
+		parser.parse(bbcodes.url);
+	}, Error);
+	t.regex(error.message, /Cannot parse content block/);
+});
+ava.test('New line: converted', (t) => {
+	let parser = new yabbc({newline: true});
+	t.is(parser.parse(newlineTest), '<h1>Nodecraft</h1><br/><strong>Game Servers Done Right</strong>');
+});
+ava.test('New line: retained', (t) => {
+	let parser = new yabbc({newline: false});
+	t.is(parser.parse(newlineTest), '<h1>Nodecraft</h1>\n<strong>Game Servers Done Right</strong>');
+});
+ava.test('Clean unmatchable: cleaned', (t) => {
+	let parser = new yabbc({cleanUnmatchable: true});
+	t.is(parser.parse(bbcodes.unmatchable), '<strong>Game Servers Done Right!</strong>');
+});
+ava.test('Clean unmatchable: retained', (t) => {
+	let parser = new yabbc({cleanUnmatchable: false});
+	t.is(parser.parse(bbcodes.unmatchable), '<strong>Game Servers Done Right![TAG-1]</strong>');
+});
+ava.test('Clear tags', (t) => {
+	let parser = new yabbc();
+	parser.clearTags();
+	t.is(parser.parse(bbcodes.b), '[b]Game Servers Done Right![/b]');
 });

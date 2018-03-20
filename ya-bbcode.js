@@ -10,10 +10,10 @@ const yabbcode = function(config = {}){
 		cleanUnmatchable: true
 	};
 	if(config.newline !== undefined){
-		this.config = config.newline;
+		this.config.newline = config.newline;
 	}
 	if(config.cleanUnmatchable !== undefined){
-		this.config = config.cleanUnmatchable;
+		this.config.cleanUnmatchable = config.cleanUnmatchable;
 	}
 
 	this.tags = {
@@ -127,7 +127,7 @@ const yabbcode = function(config = {}){
 				open = open(tag.attr);
 			}
 			if(typeof(close) === 'function'){
-				close = open(tag.attr);
+				close = close(tag.attr);
 			}
 			// do the replace
 			if(open && !tag.isClosing){
