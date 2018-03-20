@@ -29,3 +29,4 @@ install: |
       exit 1;
     fi
   fi
+after_success: npm run coverage

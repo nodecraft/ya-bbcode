@@ -4,11 +4,12 @@
   "description": "Yet another BBCode Parser",
   "main": "ya-bbcode.js",
   "scripts": {
-    "test": "ava",
-    "lint": "eslint ."
+    "coverage": "nyc report --reporter=text-lcov | coveralls",
+    "lint": "eslint .",
+    "test": "npm run lint && nyc ava"
   },
   "engines": {
-    "node": ">=8.9.0"
+    "node": ">=6"
   },
   "repository": {
     "type": "git",
@@ -29,9 +30,11 @@
   "dependencies": {},
   "devDependencies": {
     "ava": "^0.25.0",
-    "eslint": "^4.18.2",
+    "coveralls": "^3.0.0",
+    "eslint": "^4.19.0",
     "eslint-config-nodecraft": "^1.0.11",
     "eslint-plugin-json": "^1.2.0",
-    "eslint-plugin-node": "^6.0.1"
+    "eslint-plugin-node": "^6.0.1",
+    "nyc": "^11.6.0"
   }
 }
