@@ -136,6 +136,10 @@ ava.skip('Tag: noparse nested', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.noparse_nested), '[url=https://nodecraft.com][img]https://nodecraft.com/assets/images/logo.png[/img][/url]');
 });
+ava.skip('Tag: noparse unclosed', (t) => {
+	let parser = new yabbc();
+	t.is(parser.parse(bbcodes.noparse_unclosed), '[img]https://nodecraft.com/assets/images/logo.png[/img]');
+});
 ava.test('Custom Tag', (t) => {
 	let parser = new yabbc();
 	parser.registerTag('url', {
