@@ -25,16 +25,16 @@
     "parser",
     "html"
   ],
-  "author": "Nodecraft Hosting LLC",
+  "author": "Nodecraft Inc.",
   "license": "MIT",
   "dependencies": {},
   "devDependencies": {
     "ava": "^0.25.0",
-    "coveralls": "^3.0.0",
-    "eslint": "^4.19.0",
+    "coveralls": "^3.0.1",
+    "eslint": "^4.19.1",
     "eslint-config-nodecraft": "^1.0.11",
     "eslint-plugin-json": "^1.2.0",
     "eslint-plugin-node": "^6.0.1",
-    "nyc": "^11.6.0"
+    "nyc": "^12.0.2"
   }
 }
