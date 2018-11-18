@@ -1,6 +1,6 @@
 language: node_js
 node_js:
-  - 9
+  - 10
   - 8
   - 6
 env:
@@ -8,25 +8,25 @@ env:
   - FRESH_DEPS=true
 matrix:
   exclude:
-    - node_js: 9
+    - node_js: 10
+      env: FRESH_DEPS=true
+    - node_js: 8
       env: FRESH_DEPS=true
     - node_js: 6
       env: FRESH_DEPS=true
-cache:
-  directories:
-    - $HOME/.npm
+cache: npm
 before_install:
-  - npm install --global npm@5.6.0
-  - npm --version
-  - md5sum package-lock.json > package-lock.json.md5
-install: |
+  - if [[ $(node -pe "process.versions.node.split('.')[0]") == "6" ]]; then npm install --global npm@6; fi
+install: npm ci
+before_script: |
   if [[ ${FRESH_DEPS} == "true" ]]; then
-    npm install --no-shrinkwrap --prefer-online;
+    npm install --no-shrinkwrap --prefer-online
   else
-    npm install --prefer-offline;
-    if ! md5sum --quiet -c package-lock.json.md5; then
-      echo "package-lock.json was modified unexpectedly. Please rebuild it using npm@$(npm -v) and commit the changes.";
-      exit 1;
+    checksum=$(md5sum package-lock.json)
+    npm install --package-lock-only
+    if ! echo ${checksum} | md5sum --quiet -c -; then
+      echo "package-lock.json was modified unexpectedly. Please rebuild it using npm@$(npm -v) and commit the changes."
+      exit 1
     fi
   fi
 after_success: npm run coverage

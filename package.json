@@ -1,6 +1,6 @@
 {
   "name": "ya-bbcode",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Yet another BBCode Parser",
   "main": "ya-bbcode.js",
   "scripts": {
@@ -30,11 +30,11 @@
   "dependencies": {},
   "devDependencies": {
     "ava": "^0.25.0",
-    "coveralls": "^3.0.1",
-    "eslint": "^4.19.1",
-    "eslint-config-nodecraft": "^1.0.11",
-    "eslint-plugin-json": "^1.2.0",
-    "eslint-plugin-node": "^6.0.1",
-    "nyc": "^12.0.2"
+    "coveralls": "^3.0.2",
+    "eslint": "^5.9.0",
+    "eslint-config-nodecraft": "^1.1.2",
+    "eslint-plugin-json": "^1.2.1",
+    "eslint-plugin-node": "^8.0.0",
+    "nyc": "^13.1.0"
   }
 }
