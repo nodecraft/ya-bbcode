@@ -2,12 +2,15 @@
 Yet another BBCode parser.
 `npm install ya-bbcode --save`
 
-[![Build Status](https://travis-ci.org/nodecraft/ya-bbcode.svg?branch=master)](https://travis-ci.org/nodecraft/ya-bbcode) [![npm](https://img.shields.io/npm/v/ya-bbcode.svg)](https://www.npmjs.com/package/ya-bbcode) [![Coverage Status](https://coveralls.io/repos/github/nodecraft/ya-bbcode/badge.svg)](https://coveralls.io/github/nodecraft/ya-bbcode)
+[![npm version](https://badge.fury.io/js/ya-bbcode.svg)](https://badge.fury.io/js/ya-bbcode)
+[![dependencies Status](https://david-dm.org/nodecraft/ya-bbcode/status.svg)](https://david-dm.org/nodecraft/ya-bbcode)
+[![Build Status](https://travis-ci.org/nodecraft/ya-bbcode.svg?branch=master)](https://travis-ci.org/nodecraft/ya-bbcode)
+[![Coverage Status](https://coveralls.io/repos/github/nodecraft/ya-bbcode/badge.svg)](https://coveralls.io/github/nodecraft/ya-bbcode)
 
 ## Usage
 
 ```javascript
-let yabbcode = require('ya-bbcode');
+const yabbcode = require('ya-bbcode');
 let parser = new yabbcode();
 
 let bbc = '[url=https://nodecraft.com]Visit Nodecraft[/url]';

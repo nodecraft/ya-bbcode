@@ -38,30 +38,30 @@ let bbcodes = {
 let newlineTest = `[h1]Nodecraft[/h1]
 [b]Game Servers Done Right[/b]`;
 
-ava.test('Bad yabbc instance', (t) => {
+ava('Bad yabbc instance', (t) => {
 	t.is(yabbc().parse(bbcodes.none), bbcodes.none);
 });
-ava.test('No BBCode', (t) => {
+ava('No BBCode', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.none), bbcodes.none);
 });
-ava.test('Invalid BBCode / tags', (t) => {
+ava('Invalid BBCode / tags', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.invalid), bbcodes.invalid);
 });
-ava.test('BBCode ordering test', (t) => {
+ava('BBCode ordering test', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.ordering), '<blockquote author="[b">text</blockquote>');
 });
-ava.test('Nested BBCode', (t) => {
+ava('Nested BBCode', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.nested), '<a href="https://nodecraft.com"><img src="https://nodecraft.com/assets/images/logo.png" alt=""/></a>');
 });
-ava.test('Deep Nested BBCode', (t) => {
+ava('Deep Nested BBCode', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.nested_deep), '<a href="https://nodecraft.com"><strong>Game Servers <u><i>Done Right</i></u></strong></a>');
 });
-ava.test('Non string input', (t) => {
+ava('Non string input', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.undefined), '');
 	t.is(parser.parse(true), '');
@@ -71,29 +71,29 @@ ava.test('Non string input', (t) => {
 	t.is(parser.parse(1.0), '1');
 	t.is(parser.parse(12), '12');
 });
-ava.test('Tag: url', (t) => {
+ava('Tag: url', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.url), '<a href="https://nodecraft.com">Visit Nodecraft</a>');
 	t.is(parser.parse(bbcodes.url_no_attr), '<a href="#">Visit Nodecraft</a>');
 });
-ava.test('Tag: quote', (t) => {
+ava('Tag: quote', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.quote), '<blockquote author="Nodecraft">Game Servers Done Right!</blockquote>');
 	t.is(parser.parse(bbcodes.quote_no_attr), '<blockquote author="">Game Servers Done Right!</blockquote>');
 });
-ava.test('Tag: b', (t) => {
+ava('Tag: b', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.b), '<strong>Game Servers Done Right!</strong>');
 });
-ava.test('Tag: u', (t) => {
+ava('Tag: u', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.u), '<u>Game Servers Done Right!</u>');
 });
-ava.test('Tag: i', (t) => {
+ava('Tag: i', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.i), '<i>Game Servers Done Right!</i>');
 });
-ava.test('Tags: headers', (t) => {
+ava('Tags: headers', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.h1), '<h1>Game Servers Done Right!</h1>');
 	t.is(parser.parse(bbcodes.h2), '<h2>Game Servers Done Right!</h2>');
@@ -102,33 +102,33 @@ ava.test('Tags: headers', (t) => {
 	t.is(parser.parse(bbcodes.h5), '<h5>Game Servers Done Right!</h5>');
 	t.is(parser.parse(bbcodes.h6), '<h6>Game Servers Done Right!</h6>');
 });
-ava.test('Tag: code', (t) => {
+ava('Tag: code', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.code), '<code>new yabbcode();</code>');
 });
-ava.test('Tag: strike', (t) => {
+ava('Tag: strike', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.strike), '<span class="yabbcode-strike">getnodecraft.net</span>');
 });
-ava.test('Tag: spoiler', (t) => {
+ava('Tag: spoiler', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.spoiler), '<span class="yabbcode-spoiler">The cake is a lie</span>');
 });
-ava.test('Tag: list', (t) => {
+ava('Tag: list', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.list), '<ul><li> Minecraft Servers<li> ARK Servers<li> PixARK Servers<li> Rust Servers</ul>');
 });
-ava.test('Tag: olist', (t) => {
+ava('Tag: olist', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.olist), '<ol><li> Pick your games<li> Create your bot<li> Get ingame!</ol>');
 });
-ava.test('Tag: img', (t) => {
+ava('Tag: img', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.img), '<img src="https://nodecraft.com/assets/images/logo.png" alt="Nodecraft"/>');
 	t.is(parser.parse(bbcodes.img_no_attr), '<img src="https://nodecraft.com/assets/images/logo.png" alt=""/>');
 	t.is(parser.parse(bbcodes.img_invalid), '');
 });
-ava.test('Tag: noparse', (t) => {
+ava('Tag: noparse', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.noparse), '[img]https://nodecraft.com/assets/images/logo.png[/img]');
 });
@@ -140,7 +140,7 @@ ava.skip('Tag: noparse unclosed', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.noparse_unclosed), '[img]https://nodecraft.com/assets/images/logo.png[/img]');
 });
-ava.test('Custom Tag', (t) => {
+ava('Custom Tag', (t) => {
 	let parser = new yabbc();
 	parser.registerTag('url', {
 		type: 'replace',
@@ -153,7 +153,7 @@ ava.test('Custom Tag', (t) => {
 	});
 	t.is(parser.parse(bbcodes.url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
 });
-ava.test('Custom Tag: Invalid Type', (t) => {
+ava('Custom Tag: Invalid Type', (t) => {
 	let parser = new yabbc();
 	parser.registerTag('url', {
 		type: 'expand',
@@ -169,23 +169,23 @@ ava.test('Custom Tag: Invalid Type', (t) => {
 	}, Error);
 	t.regex(error.message, /Cannot parse content block/);
 });
-ava.test('New line: converted', (t) => {
+ava('New line: converted', (t) => {
 	let parser = new yabbc({newline: true});
 	t.is(parser.parse(newlineTest), '<h1>Nodecraft</h1><br/><strong>Game Servers Done Right</strong>');
 });
-ava.test('New line: retained', (t) => {
+ava('New line: retained', (t) => {
 	let parser = new yabbc({newline: false});
 	t.is(parser.parse(newlineTest), '<h1>Nodecraft</h1>\n<strong>Game Servers Done Right</strong>');
 });
-ava.test('Clean unmatchable: cleaned', (t) => {
+ava('Clean unmatchable: cleaned', (t) => {
 	let parser = new yabbc({cleanUnmatchable: true});
 	t.is(parser.parse(bbcodes.unmatchable), '<strong>Game Servers Done Right!</strong>');
 });
-ava.test('Clean unmatchable: retained', (t) => {
+ava('Clean unmatchable: retained', (t) => {
 	let parser = new yabbc({cleanUnmatchable: false});
 	t.is(parser.parse(bbcodes.unmatchable), '<strong>Game Servers Done Right![TAG-1]</strong>');
 });
-ava.test('Clear tags', (t) => {
+ava('Clear tags', (t) => {
 	let parser = new yabbc();
 	parser.clearTags();
 	t.is(parser.parse(bbcodes.b), '[b]Game Servers Done Right![/b]');
