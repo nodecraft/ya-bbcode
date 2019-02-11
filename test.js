@@ -13,6 +13,7 @@ let bbcodes = {
 	'url': '[url=https://nodecraft.com]Visit Nodecraft[/url]',
 	'url_no_attr': '[url]Visit Nodecraft[/url]',
 	'nodecraft_url': '[nodecraft-url][/nodecraft-url]',
+	'pre': '[pre]Minecraft is a really fun game![/pre]',
 	'quote': '[quote=Nodecraft]Game Servers Done Right![/quote]',
 	'quote_no_attr': '[quote]Game Servers Done Right![/quote]',
 	'b': '[b]Game Servers Done Right![/b]',
@@ -184,6 +185,16 @@ ava('Custom Tag, string close', (t) => {
 		close: '</a>'
 	});
 	t.is(parser.parse(bbcodes.nodecraft_url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
+});
+ava('Custom Tag, content with replace func', (t) => {
+	let parser = new yabbc();
+	parser.registerTag('pre', {
+		type: 'content',
+		replace: (attr, content) => {
+			return `<pre>${content}</pre>`;
+		}
+	});
+	t.is(parser.parse(bbcodes.pre), '<pre>Minecraft is a really fun game!</pre>');
 });
 ava('Custom Tag: Invalid Type', (t) => {
 	let parser = new yabbc();
