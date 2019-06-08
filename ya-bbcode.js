@@ -292,6 +292,10 @@ yabbcode.prototype.parse = function(bbcInput){
 	// split input into tags by index
 	let tags = String(input).match(this.regex.tags);
 
+	if(this.config.newline){
+		input = input.replace(this.regex.newline, "<br/>");
+	}
+
 	// handle when no tags are present
 	if(!tags || !tags.length){
 		return input;
@@ -320,9 +324,6 @@ yabbcode.prototype.parse = function(bbcInput){
 	tagsMap = this._tagLoop(tagsMap);
 	// put back all non-found matches?
 	input = this._contentLoop(tagsMap, input);
-	if(this.config.newline){
-		input = input.replace(this.regex.newline, "<br/>");
-	}
 	if(this.config.cleanUnmatchable){
 		input = input.replace(this.regex.placeholders, '');
 	}
