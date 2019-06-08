@@ -293,12 +293,12 @@ yabbcode.prototype.parse = function(bbcInput){
 	let tags = String(input).match(this.regex.tags);
 
 	if(this.config.newline){
-		input = input.replace(this.regex.newline, "<br/>");
+		input = input.replace(this.regex.newline, "</p><p>");
 	}
 
 	// handle when no tags are present
 	if(!tags || !tags.length){
-		return input;
+		return '<p>' + input + '</p>';
 	}
 	tags.forEach((tag, i) => {
 		let parts = tag.slice(1, -1).split('=');
@@ -327,7 +327,7 @@ yabbcode.prototype.parse = function(bbcInput){
 	if(this.config.cleanUnmatchable){
 		input = input.replace(this.regex.placeholders, '');
 	}
-	return input;
+	return '<p>' + input + '</p>';
 };
 
 module.exports = yabbcode;
