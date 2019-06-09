@@ -7,10 +7,14 @@ const yabbcode = function(config = {}){
 	let self = this;
 	this.config = {
 		newline: true,
+		paragraph: false,
 		cleanUnmatchable: true
 	};
 	if(config.newline !== undefined){
 		this.config.newline = config.newline;
+	}
+	if(config.paragraph !== undefined){
+		this.config.paragraph = config.paragraph;
 	}
 	if(config.cleanUnmatchable !== undefined){
 		this.config.cleanUnmatchable = config.cleanUnmatchable;
@@ -293,12 +297,19 @@ yabbcode.prototype.parse = function(bbcInput){
 	let tags = String(input).match(this.regex.tags);
 
 	if(this.config.newline){
-		input = input.replace(this.regex.newline, "</p><p>");
+		if(this.config.paragraph){
+			input = input.replace(this.regex.newline, "</p><p>");
+		}else{
+			input = input.replace(this.regex.newline, "<br/>");
+		}
+	}
+	if(this.config.paragraph){
+		input = '<p>' + input + '</p>';
 	}
 
 	// handle when no tags are present
 	if(!tags || !tags.length){
-		return '<p>' + input + '</p>';
+		return input;
 	}
 	tags.forEach((tag, i) => {
 		let parts = tag.slice(1, -1).split('=');
@@ -327,7 +338,7 @@ yabbcode.prototype.parse = function(bbcInput){
 	if(this.config.cleanUnmatchable){
 		input = input.replace(this.regex.placeholders, '');
 	}
-	return '<p>' + input + '</p>';
+	return input;
 };
 
 module.exports = yabbcode;
