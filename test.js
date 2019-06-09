@@ -229,6 +229,10 @@ ava('New line: converted with no tag', (t) => {
 	let parser = new yabbc({newline: true});
 	t.is(parser.parse(bbcodes.newline_notag), 'Nodecraft<br/>Game Servers Done Right');
 });
+ava('Paragraph: enabled', (t) => {
+	let parser = new yabbc({newline: true, paragraph: true});
+	t.is(parser.parse(bbcodes.newline), '<p><h1>Nodecraft</h1></p><p><strong>Game Servers Done Right</strong></p>');
+});
 ava('Clean unmatchable: cleaned', (t) => {
 	let parser = new yabbc({cleanUnmatchable: true});
 	t.is(parser.parse(bbcodes.unmatchable), '<strong>Game Servers Done Right!</strong>');
