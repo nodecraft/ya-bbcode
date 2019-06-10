@@ -1,40 +1,43 @@
 {
 	"name": "ya-bbcode",
-	"version": "1.0.7",
+	"version": "1.0.8",
 	"description": "Yet another BBCode Parser",
+	"keywords": [
+		"bbc",
+		"bbcode",
+		"html",
+		"parser"
+	],
+	"homepage": "https://github.com/nodecraft/ya-bbcode",
+	"bugs": {
+		"url": "https://github.com/nodecraft/ya-bbcode/issues"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/nodecraft/ya-bbcode"
+	},
+	"license": "MIT",
+	"author": "Nodecraft Inc.",
+	"files": [
+		"ya-bbcode.js"
+	],
 	"main": "ya-bbcode.js",
 	"scripts": {
 		"coverage": "nyc report --reporter=text-lcov | coveralls",
 		"lint": "eslint .",
 		"test": "npm run lint && nyc ava"
 	},
-	"engines": {
-		"node": ">=8"
-	},
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/nodecraft/ya-bbcode"
-	},
-	"homepage": "https://github.com/nodecraft/ya-bbcode",
-	"bugs": {
-		"url": "https://github.com/nodecraft/ya-bbcode/issues"
-	},
-	"keywords": [
-		"bbc",
-		"bbcode",
-		"parser",
-		"html"
-	],
-	"author": "Nodecraft Inc.",
-	"license": "MIT",
 	"dependencies": {},
 	"devDependencies": {
 		"ava": "^2.0.0",
-		"coveralls": "^3.0.3",
+		"coveralls": "^3.0.4",
 		"eslint": "^5.16.0",
 		"eslint-config-nodecraft": "^1.6.0",
 		"eslint-plugin-json": "^1.4.0",
 		"eslint-plugin-node": "^9.1.0",
 		"nyc": "^14.1.1"
+	},
+	"engines": {
+		"node": ">=8"
 	}
 }
