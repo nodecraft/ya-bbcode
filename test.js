@@ -2,6 +2,11 @@
 const ava = require('ava');
 const yabbc = require('./ya-bbcode.js');
 
+let newlineTest = `[h1]Nodecraft[/h1]
+[b]Game Servers Done Right[/b]`;
+let newlineNoTagTest = `Nodecraft
+Game Servers Done Right`;
+
 let bbcodes = {
 	'none': 'Nodecraft Game servers',
 	'invalid': '[Nodecraft]Game servers[/nodecraft]',
@@ -35,10 +40,10 @@ let bbcodes = {
 	'img_invalid': '[img][/img]',
 	'noparse': '[noparse][img]https://nodecraft.com/assets/images/logo.png[/img][/noparse]',
 	'noparse_nested': '[noparse][url=https://nodecraft.com][img]https://nodecraft.com/assets/images/logo.png[/img][/url][/noparse]',
-	'noparse_unclosed': '[noparse][img]https://nodecraft.com/assets/images/logo.png[/img]'
+	'noparse_unclosed': '[noparse][img]https://nodecraft.com/assets/images/logo.png[/img]',
+	'newline': newlineTest,
+	'newline_notag': newlineNoTagTest
 };
-let newlineTest = `[h1]Nodecraft[/h1]
-[b]Game Servers Done Right[/b]`;
 
 ava('Bad yabbc instance', (t) => {
 	t.is(yabbc().parse(bbcodes.none), bbcodes.none);
@@ -214,11 +219,19 @@ ava('Custom Tag: Invalid Type', (t) => {
 });
 ava('New line: converted', (t) => {
 	let parser = new yabbc({newline: true});
-	t.is(parser.parse(newlineTest), '<h1>Nodecraft</h1><br/><strong>Game Servers Done Right</strong>');
+	t.is(parser.parse(bbcodes.newline), '<h1>Nodecraft</h1><br/><strong>Game Servers Done Right</strong>');
 });
 ava('New line: retained', (t) => {
 	let parser = new yabbc({newline: false});
-	t.is(parser.parse(newlineTest), '<h1>Nodecraft</h1>\n<strong>Game Servers Done Right</strong>');
+	t.is(parser.parse(bbcodes.newline), '<h1>Nodecraft</h1>\n<strong>Game Servers Done Right</strong>');
+});
+ava('New line: converted with no tag', (t) => {
+	let parser = new yabbc({newline: true});
+	t.is(parser.parse(bbcodes.newline_notag), 'Nodecraft<br/>Game Servers Done Right');
+});
+ava('Paragraph: enabled', (t) => {
+	let parser = new yabbc({newline: true, paragraph: true});
+	t.is(parser.parse(bbcodes.newline), '<p><h1>Nodecraft</h1></p><p><strong>Game Servers Done Right</strong></p>');
 });
 ava('Clean unmatchable: cleaned', (t) => {
 	let parser = new yabbc({cleanUnmatchable: true});
