@@ -4,7 +4,7 @@ Yet another BBCode parser.
 
 [![npm version](https://badge.fury.io/js/ya-bbcode.svg)](https://badge.fury.io/js/ya-bbcode)
 [![dependencies Status](https://david-dm.org/nodecraft/ya-bbcode/status.svg)](https://david-dm.org/nodecraft/ya-bbcode)
-[![Build Status](https://travis-ci.org/nodecraft/ya-bbcode.svg?branch=master)](https://travis-ci.org/nodecraft/ya-bbcode)
+[![Actions Status](https://github.com/nodecraft/ya-bbcode/workflows/Test/badge.svg)](https://github.com/nodecraft/ya-bbcode/actions)
 [![Coverage Status](https://coveralls.io/repos/github/nodecraft/ya-bbcode/badge.svg)](https://coveralls.io/github/nodecraft/ya-bbcode)
 
 ## Usage
