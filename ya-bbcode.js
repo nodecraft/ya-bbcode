@@ -190,7 +190,7 @@ yabbcode.prototype._ignoreLoop = function(tagsMap, content){
 			content = content.replace('[TAG-' + tag.closing.index + ']', tag.closing.raw);
 		}
 		if(tag.children.length){
-			this._ignoreLoop(tag.children, content);
+			content = this._ignoreLoop(tag.children, content);
 		}
 	});
 	return content;
