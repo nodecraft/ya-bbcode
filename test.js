@@ -139,7 +139,7 @@ ava('Tag: noparse', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.noparse), '[img]https://nodecraft.com/assets/images/logo.png[/img]');
 });
-ava.skip('Tag: noparse nested', (t) => {
+ava('Tag: noparse nested', (t) => {
 	let parser = new yabbc();
 	t.is(parser.parse(bbcodes.noparse_nested), '[url=https://nodecraft.com][img]https://nodecraft.com/assets/images/logo.png[/img][/url]');
 });
