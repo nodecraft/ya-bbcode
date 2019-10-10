@@ -162,17 +162,18 @@ const yabbcode = function(config = {}){
 			return contentStart + replace + contentEnd;
 		},
 		ignore: (tag, module, content) => {
-			if(!tag.closing){ return content; }
-			let openTag = "[TAG-" + tag.index + "]",
+			let openTag = "[TAG-" + tag.index + "]";
+			let start = content.indexOf(openTag);
+			let closeTag = "";
+			let end = content.length;
+			if(tag.closing){
 				closeTag = "[TAG-" + tag.closing.index + "]";
-			let start = content.indexOf(openTag),
 				end = content.indexOf(closeTag);
-
+			}
 			let innerContent = content.substr(start + openTag.length, end - (start + openTag.length));
 			innerContent = self._ignoreLoop(tag.children, innerContent);
 			let contentStart = content.substr(0, start),
 				contentEnd = content.substr(end + closeTag.length);
-
 			return contentStart + innerContent + contentEnd;
 		}
 	};
@@ -242,25 +243,30 @@ yabbcode.prototype._tagLoop = function(tagsMap, parent){
 			tagsMap[currentTagIndex].matchTag = item.index;
 			found = i; // next index
 		});
-		if(found !== false){
-			// sweep children
-			let childStart = currentTagIndex + 1;
-			if(childStart < found){
-				tagsMap[currentTagIndex].children = tagsMap.slice(childStart, found).map((child) => {
-					child.parent = tagsMap[currentTagIndex].index;
-					return child;
-				});
-			}
-			tagsMap[currentTagIndex].closing = tagsMap[tagsMap[currentTagIndex].matchTag];
 
-			let i = childStart;
-			while(i < found){
-				tagsMap[i].parent = tagsMap[currentTagIndex].index;
-				i++;
-			}
+		let childStart = currentTagIndex + 1;
+
+		if(found !== false){
+			tagsMap[currentTagIndex].closing = tagsMap[tagsMap[currentTagIndex].matchTag];
 		}else{
 			tagsMap[currentTagIndex].matchTag = false;
+			found = tagsMap.length - 1;
 		}
+
+		// sweep children
+		if(childStart < found){
+			tagsMap[currentTagIndex].children = tagsMap.slice(childStart, found).map((child) => {
+				child.parent = tagsMap[currentTagIndex].index;
+				return child;
+			});
+		}
+
+		let i = childStart;
+		while(i < found){
+			tagsMap[i].parent = tagsMap[currentTagIndex].index;
+			i++;
+		}
+
 		currentTagIndex++; // move on
 	}
 
