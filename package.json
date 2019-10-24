@@ -1,6 +1,6 @@
 {
 	"name": "ya-bbcode",
-	"version": "1.0.10",
+	"version": "1.0.11",
 	"description": "Yet another BBCode Parser",
 	"keywords": [
 		"bbc",
@@ -30,7 +30,7 @@
 	"dependencies": {},
 	"devDependencies": {
 		"ava": "^2.4.0",
-		"coveralls": "^3.0.6",
+		"coveralls": "^3.0.7",
 		"eslint": "^6.5.1",
 		"eslint-config-nodecraft": "^1.7.3",
 		"eslint-plugin-json": "^1.4.0",
