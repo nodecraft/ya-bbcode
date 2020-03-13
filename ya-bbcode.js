@@ -4,7 +4,7 @@ const yabbcode = function(config = {}){
 	if(!(this instanceof yabbcode)){
 		return new yabbcode();
 	}
-	let self = this;
+	const self = this;
 	this.config = {
 		newline: true,
 		paragraph: false,
@@ -145,25 +145,25 @@ const yabbcode = function(config = {}){
 		},
 		content: (tag, module, content) => {
 			if(!tag.closing){ return content; }
-			let openTag = "[TAG-" + tag.index + "]",
+			const openTag = "[TAG-" + tag.index + "]",
 				closeTag = "[TAG-" + tag.closing.index + "]";
-			let start = content.indexOf(openTag),
-				end = content.indexOf(closeTag),
-				replace = module.replace;
+			const start = content.indexOf(openTag),
+				end = content.indexOf(closeTag);
+			let	replace = module.replace;
 
-			let innerContent = content.substr(start + openTag.length, end - (start + openTag.length));
+			const innerContent = content.substr(start + openTag.length, end - (start + openTag.length));
 			if(typeof(replace) === 'function'){
 				replace = replace(tag.attr, innerContent);
 			}
 
-			let contentStart = content.substr(0, start),
+			const contentStart = content.substr(0, start),
 				contentEnd = content.substr(end + closeTag.length);
 
 			return contentStart + replace + contentEnd;
 		},
 		ignore: (tag, module, content) => {
-			let openTag = "[TAG-" + tag.index + "]";
-			let start = content.indexOf(openTag);
+			const openTag = "[TAG-" + tag.index + "]";
+			const start = content.indexOf(openTag);
 			let closeTag = "";
 			let end = content.length;
 			if(tag.closing){
@@ -172,7 +172,7 @@ const yabbcode = function(config = {}){
 			}
 			let innerContent = content.substr(start + openTag.length, end - (start + openTag.length));
 			innerContent = self._ignoreLoop(tag.children, innerContent);
-			let contentStart = content.substr(0, start),
+			const contentStart = content.substr(0, start),
 				contentEnd = content.substr(end + closeTag.length);
 			return contentStart + innerContent + contentEnd;
 		}
@@ -244,7 +244,7 @@ yabbcode.prototype._tagLoop = function(tagsMap, parent){
 			found = i; // next index
 		});
 
-		let childStart = currentTagIndex + 1;
+		const childStart = currentTagIndex + 1;
 
 		if(found !== false){
 			tagsMap[currentTagIndex].closing = tagsMap[tagsMap[currentTagIndex].matchTag];
@@ -300,7 +300,7 @@ yabbcode.prototype.parse = function(bbcInput){
 	// reset
 	let tagsMap = [];
 	// split input into tags by index
-	let tags = String(input).match(this.regex.tags);
+	const tags = String(input).match(this.regex.tags);
 
 	if(this.config.newline){
 		if(this.config.paragraph){
@@ -318,8 +318,8 @@ yabbcode.prototype.parse = function(bbcInput){
 		return input;
 	}
 	tags.forEach((tag, i) => {
-		let parts = tag.slice(1, -1).split('=');
-		let item = {
+		const parts = tag.slice(1, -1).split('=');
+		const item = {
 			index: i,
 			module: parts[0].toLowerCase(),
 			isClosing: tag.slice(1, 2) === '/',

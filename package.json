@@ -24,18 +24,18 @@
 	"main": "ya-bbcode.js",
 	"scripts": {
 		"coverage": "nyc report --reporter=lcov",
-		"lint": "eslint .",
+		"lint": "eslint . --fix",
 		"test": "npm run lint && nyc ava"
 	},
 	"dependencies": {},
 	"devDependencies": {
-		"ava": "^2.4.0",
-		"coveralls": "^3.0.7",
-		"eslint": "^6.5.1",
-		"eslint-config-nodecraft": "^1.7.3",
-		"eslint-plugin-json": "^1.4.0",
-		"eslint-plugin-node": "^10.0.0",
-		"nyc": "^14.1.1"
+		"ava": "^3.5.0",
+		"coveralls": "^3.0.9",
+		"eslint": "^6.8.0",
+		"eslint-config-nodecraft": "^2.1.4",
+		"eslint-plugin-json": "^2.1.0",
+		"eslint-plugin-node": "^11.0.0",
+		"nyc": "^15.0.0"
 	},
 	"engines": {
 		"node": ">=8"
