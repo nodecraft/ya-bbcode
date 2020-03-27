@@ -19,9 +19,11 @@
 	"license": "MIT",
 	"author": "Nodecraft Inc.",
 	"files": [
-		"ya-bbcode.js"
+		"ya-bbcode.js",
+		"ya-bbcode.d.ts"
 	],
 	"main": "ya-bbcode.js",
+	"types": "ya-bbcode.d.ts",
 	"scripts": {
 		"coverage": "nyc report --reporter=lcov",
 		"lint": "eslint . --fix",
