@@ -4,12 +4,16 @@ declare class yabbcode {
 	/**
 	 * Create a new bbcode parser
 	 */
-	constructor()
+	constructor(config?: {
+		newline?: boolean
+		paragraph?: boolean
+		cleanUnmatchable?: boolean
+	})
 	/**
 	 * Parse bbcode
 	 * @param bbc bbcode to parse
 	 */
-	parse(bbc: string): string
+	parse(bbc: any): string
 	/**
 	 * Remove all default or registered tags
 	 */
@@ -20,8 +24,15 @@ declare class yabbcode {
 	 * @param options options to parse the tag
 	 */
 	registerTag(tag: string, options: {
-		type: string
+		type: 'replace'
 		open: ((attr: string) => string) | string
-		close: ((attr: string) => string) | string
+		close: ((attr: string) => string) | string | null
+	}): this
+	registerTag(tag: string, options: {
+		type: 'content',
+		replace: (attr: string, content: string) => string
+	}): this
+	registerTag(tag: string, options: {
+		type: 'ignore'
 	}): this
 }
