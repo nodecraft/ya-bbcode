@@ -23,16 +23,12 @@ const yabbcode = function(config = {}){
 	this.tags = {
 		'url': {
 			type: 'replace',
-			open: (attr) => {
-				return `<a href="${attr || '#'}">`;
-			},
+			open: attr => `<a href="${attr || '#'}">`,
 			close: '</a>'
 		},
 		'quote': {
 			type: 'replace',
-			open: (attr) => {
-				return `<blockquote author="${attr || ''}">`;
-			},
+			open: attr => `<blockquote author="${attr || ''}">`,
 			close: '</blockquote>'
 		},
 		'b': {
@@ -271,10 +267,8 @@ yabbcode.prototype._tagLoop = function(tagsMap, parent){
 	}
 
 	// sweep children & matched closing tags
-	tagsMap = tagsMap.filter((item) => {
-		// TODO: make this more readable
-		return !((parent === undefined && item.parent !== null) || (item.parent !== null && item.parent !== parent) || item.isClosing);
-	});
+	// TODO: make this more readable
+	tagsMap = tagsMap.filter(item => !((parent === undefined && item.parent !== null) || (item.parent !== null && item.parent !== parent) || item.isClosing));
 
 	return tagsMap.map((tag) => {
 		if(tag.children.length){
@@ -295,7 +289,7 @@ yabbcode.prototype.registerTag = function(tag, options){
 };
 
 yabbcode.prototype.parse = function(bbcInput){
-	if(typeof(bbcInput) === 'boolean' || typeof(bbcInput) !== 'string' && isNaN(bbcInput)){ return ''; }
+	if(typeof(bbcInput) === 'boolean' || typeof(bbcInput) !== 'string' && Number.isNaN(Number(bbcInput))){ return ''; }
 	let input = String(bbcInput).slice(0); // cheap string clone
 	// reset
 	let tagsMap = [];

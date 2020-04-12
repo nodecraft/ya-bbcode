@@ -151,12 +151,8 @@ ava('Custom Tag, all functions', (t) => {
 	const parser = new yabbc();
 	parser.registerTag('url', {
 		type: 'replace',
-		open: (attr) => {
-			return `<a href="${attr || '#'}" rel="noopener nofollow" target="_blank">`;
-		},
-		close: () => {
-			return '</a>';
-		}
+		open: attr => `<a href="${attr || '#'}" rel="noopener nofollow" target="_blank">`,
+		close: () => '</a>'
 	});
 	t.is(parser.parse(bbcodes.url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
 });
@@ -174,9 +170,7 @@ ava('Custom Tag, string open', (t) => {
 	parser.registerTag('nodecraft-url', {
 		type: 'replace',
 		open: `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`,
-		close: () => {
-			return '</a>';
-		}
+		close: () => '</a>'
 	});
 	t.is(parser.parse(bbcodes.nodecraft_url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
 });
@@ -184,9 +178,7 @@ ava('Custom Tag, string close', (t) => {
 	const parser = new yabbc();
 	parser.registerTag('nodecraft-url', {
 		type: 'replace',
-		open: () => {
-			return `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`;
-		},
+		open: () => `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`,
 		close: '</a>'
 	});
 	t.is(parser.parse(bbcodes.nodecraft_url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
@@ -195,9 +187,7 @@ ava('Custom Tag, content with replace func', (t) => {
 	const parser = new yabbc();
 	parser.registerTag('pre', {
 		type: 'content',
-		replace: (attr, content) => {
-			return `<pre>${content}</pre>`;
-		}
+		replace: (attr, content) => `<pre>${content}</pre>`
 	});
 	t.is(parser.parse(bbcodes.pre), '<pre>Minecraft is a really fun game!</pre>');
 });
@@ -205,12 +195,8 @@ ava('Custom Tag: Invalid Type', (t) => {
 	const parser = new yabbc();
 	parser.registerTag('url', {
 		type: 'expand',
-		open: () => {
-			return `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`;
-		},
-		close: () => {
-			return '</a>';
-		}
+		open: () => `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`,
+		close: () => '</a>'
 	});
 	t.throws(() => {
 		parser.parse(bbcodes.url);
