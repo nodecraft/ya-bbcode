@@ -18,26 +18,39 @@
 	},
 	"license": "MIT",
 	"author": "Nodecraft Inc.",
+	"main": "ya-bbcode.js",
+	"types": "ya-bbcode.d.ts",
 	"files": [
 		"ya-bbcode.js",
 		"ya-bbcode.d.ts"
 	],
-	"main": "ya-bbcode.js",
-	"types": "ya-bbcode.d.ts",
 	"scripts": {
 		"coverage": "nyc report --reporter=lcov",
 		"lint": "eslint . --fix",
 		"test": "npm run lint && nyc ava"
 	},
+	"husky": {
+		"hooks": {
+			"pre-commit": "npx lint-staged",
+			"commit-msg": "npx commitlint -E HUSKY_GIT_PARAMS"
+		}
+	},
+	"lint-staged": {
+		"*.js": "eslint --cache"
+	},
 	"dependencies": {},
 	"devDependencies": {
-		"ava": "^3.6.0",
-		"coveralls": "^3.0.11",
-		"eslint": "^6.8.0",
-		"eslint-config-nodecraft": "^3.0.2",
-		"eslint-plugin-json": "^2.1.1",
+		"@commitlint/cli": "^11.0.0",
+		"@commitlint/config-conventional": "^11.0.0",
+		"ava": "^3.13.0",
+		"coveralls": "^3.1.0",
+		"eslint": "^7.10.0",
+		"eslint-config-nodecraft": "^6.0.0",
+		"eslint-plugin-json": "^2.1.2",
 		"eslint-plugin-node": "^11.1.0",
-		"nyc": "^15.0.1"
+		"husky": "^4.3.0",
+		"lint-staged": "^10.4.0",
+		"nyc": "^15.1.0"
 	},
 	"engines": {
 		"node": ">=8"

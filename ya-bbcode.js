@@ -121,8 +121,8 @@ const yabbcode = function(config = {}){
 	};
 	this.contentModules = {
 		replace: (tag, module, content) => {
-			let open = module.open,
-				close = module.close;
+			let open = module.open;
+			let close = module.close;
 			if(typeof(open) === 'function'){
 				open = open(tag.attr);
 			}
@@ -141,10 +141,10 @@ const yabbcode = function(config = {}){
 		},
 		content: (tag, module, content) => {
 			if(!tag.closing){ return content; }
-			const openTag = "[TAG-" + tag.index + "]",
-				closeTag = "[TAG-" + tag.closing.index + "]";
-			const start = content.indexOf(openTag),
-				end = content.indexOf(closeTag);
+			const openTag = "[TAG-" + tag.index + "]";
+			const closeTag = "[TAG-" + tag.closing.index + "]";
+			const start = content.indexOf(openTag);
+			const end = content.indexOf(closeTag);
 			let	replace = module.replace;
 
 			const innerContent = content.substr(start + openTag.length, end - (start + openTag.length));
@@ -152,8 +152,8 @@ const yabbcode = function(config = {}){
 				replace = replace(tag.attr, innerContent);
 			}
 
-			const contentStart = content.substr(0, start),
-				contentEnd = content.substr(end + closeTag.length);
+			const contentStart = content.substr(0, start);
+			const contentEnd = content.substr(end + closeTag.length);
 
 			return contentStart + replace + contentEnd;
 		},
@@ -168,8 +168,8 @@ const yabbcode = function(config = {}){
 			}
 			let innerContent = content.substr(start + openTag.length, end - (start + openTag.length));
 			innerContent = self._ignoreLoop(tag.children, innerContent);
-			const contentStart = content.substr(0, start),
-				contentEnd = content.substr(end + closeTag.length);
+			const contentStart = content.substr(0, start);
+			const contentEnd = content.substr(end + closeTag.length);
 			return contentStart + innerContent + contentEnd;
 		}
 	};
