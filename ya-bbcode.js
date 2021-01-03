@@ -147,13 +147,13 @@ const yabbcode = function(config = {}){
 			const end = content.indexOf(closeTag);
 			let	replace = module.replace;
 
-			const innerContent = content.substr(start + openTag.length, end - (start + openTag.length));
+			const innerContent = content.slice(start + openTag.length, end);
 			if(typeof(replace) === 'function'){
 				replace = replace(tag.attr, innerContent);
 			}
 
-			const contentStart = content.substr(0, start);
-			const contentEnd = content.substr(end + closeTag.length);
+			const contentStart = content.slice(0, Math.max(0, start));
+			const contentEnd = content.slice(end + closeTag.length);
 
 			return contentStart + replace + contentEnd;
 		},
@@ -166,18 +166,18 @@ const yabbcode = function(config = {}){
 				closeTag = "[TAG-" + tag.closing.index + "]";
 				end = content.indexOf(closeTag);
 			}
-			let innerContent = content.substr(start + openTag.length, end - (start + openTag.length));
+			let innerContent = content.slice(start + openTag.length, end);
 			innerContent = self._ignoreLoop(tag.children, innerContent);
-			const contentStart = content.substr(0, start);
-			const contentEnd = content.substr(end + closeTag.length);
+			const contentStart = content.slice(0, Math.max(0, start));
+			const contentEnd = content.slice(end + closeTag.length);
 			return contentStart + innerContent + contentEnd;
 		}
 	};
 
 	this.regex = {
-		tags: /(\[[^\]^\s]{1,}\])/g,
-		newline: /(?:\r\n|\r|\n)/g,
-		placeholders: /\[TAG-[1-9]{1,}\]/g
+		tags: /(\[[^\s\]^]+])/g,
+		newline: /\r\n|\r|\n/g,
+		placeholders: /\[TAG-[1-9]+]/g
 	};
 };
 yabbcode.prototype._ignoreLoop = function(tagsMap, content){
@@ -186,7 +186,7 @@ yabbcode.prototype._ignoreLoop = function(tagsMap, content){
 		if(tag.closing){
 			content = content.replace('[TAG-' + tag.closing.index + ']', tag.closing.raw);
 		}
-		if(tag.children.length){
+		if(tag.children.length > 0){
 			content = this._ignoreLoop(tag.children, content);
 		}
 	});
@@ -208,7 +208,7 @@ yabbcode.prototype._contentLoop = function(tagsMap, content){
 			throw new Error("Cannot parse content block. Invalid block type [" + module.type + "] provided for tag [" + tag.module + "]");
 		}
 		content = this.contentModules[module.type](tag, module, content);
-		if(tag.children.length && module.type !== 'ignore'){
+		if(tag.children.length > 0 && module.type !== 'ignore'){
 			content = this._contentLoop(tag.children, content);
 		}
 	});
@@ -271,7 +271,7 @@ yabbcode.prototype._tagLoop = function(tagsMap, parent){
 	tagsMap = tagsMap.filter(item => !((parent === undefined && item.parent !== null) || (item.parent !== null && item.parent !== parent) || item.isClosing));
 
 	return tagsMap.map((tag) => {
-		if(tag.children.length){
+		if(tag.children.length > 0){
 			tag.children = this._tagLoop(tag.children, tag.index);
 		}
 		return tag;
@@ -308,7 +308,7 @@ yabbcode.prototype.parse = function(bbcInput){
 	}
 
 	// handle when no tags are present
-	if(!tags || !tags.length){
+	if(!tags || tags.length === 0){
 		return input;
 	}
 	tags.forEach((tag, i) => {

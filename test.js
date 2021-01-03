@@ -75,7 +75,7 @@ ava('Non string input', (t) => {
 	t.is(parser.parse({}), '');
 	t.is(parser.parse([]), '');
 	t.is(parser.parse(() => {}), '');
-	t.is(parser.parse(1.0), '1');
+	t.is(parser.parse(1), '1');
 	t.is(parser.parse(12), '12');
 });
 ava('Tag: url', (t) => {
