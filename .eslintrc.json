@@ -1,6 +1,6 @@
 {
 	"extends": [
-		"nodecraft"
+		"@nodecraft"
 	],
 	"plugins": [
 		"json",

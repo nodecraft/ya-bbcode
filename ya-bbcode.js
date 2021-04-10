@@ -181,7 +181,7 @@ const yabbcode = function(config = {}){
 	};
 };
 yabbcode.prototype._ignoreLoop = function(tagsMap, content){
-	tagsMap.forEach((tag) => {
+	for(const tag of tagsMap){
 		content = content.replace('[TAG-' + tag.index + ']', tag.raw);
 		if(tag.closing){
 			content = content.replace('[TAG-' + tag.closing.index + ']', tag.closing.raw);
@@ -189,12 +189,12 @@ yabbcode.prototype._ignoreLoop = function(tagsMap, content){
 		if(tag.children.length > 0){
 			content = this._ignoreLoop(tag.children, content);
 		}
-	});
+	}
 	return content;
 };
 
 yabbcode.prototype._contentLoop = function(tagsMap, content){
-	tagsMap.forEach((tag) => {
+	for(const tag of tagsMap){
 		let module = this.tags[tag.module];
 		if(!module){
 			// ignore invalid BBCode
@@ -211,7 +211,7 @@ yabbcode.prototype._contentLoop = function(tagsMap, content){
 		if(tag.children.length > 0 && module.type !== 'ignore'){
 			content = this._contentLoop(tag.children, content);
 		}
-	});
+	}
 
 	return content;
 };
@@ -224,7 +224,7 @@ yabbcode.prototype._tagLoop = function(tagsMap, parent){
 			currentTagIndex++;
 			continue; // already handled this tag / not closing
 		}
-		tagsMap.forEach((item, i) => {
+		for(const [i, item] of tagsMap.entries()){
 			if(
 				found ||
 				tagsMap[currentTagIndex].matchTag !== null ||
@@ -233,12 +233,12 @@ yabbcode.prototype._tagLoop = function(tagsMap, parent){
 				!item.isClosing ||
 				tagsMap[currentTagIndex].module !== item.module
 			){
-				return;
+				continue;
 			}
 			tagsMap[i].matchTag = tagsMap[currentTagIndex].index;
 			tagsMap[currentTagIndex].matchTag = item.index;
 			found = i; // next index
-		});
+		}
 
 		const childStart = currentTagIndex + 1;
 
@@ -311,7 +311,7 @@ yabbcode.prototype.parse = function(bbcInput){
 	if(!tags || tags.length === 0){
 		return input;
 	}
-	tags.forEach((tag, i) => {
+	for(const [i, tag] of tags.entries()){
 		const parts = tag.slice(1, -1).split('=');
 		const item = {
 			index: i,
@@ -330,7 +330,7 @@ yabbcode.prototype.parse = function(bbcInput){
 
 		tagsMap.push(item);
 		input = input.replace(tag, '[TAG-' + i + ']'); // placeholder for tag
-	});
+	}
 	// loop through each tag to create nested elements
 	tagsMap = this._tagLoop(tagsMap);
 	// put back all non-found matches?
