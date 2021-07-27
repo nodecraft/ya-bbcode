@@ -36,7 +36,7 @@
 	},
 	"dependencies": {},
 	"devDependencies": {
-		"@commitlint/cli": "^12.1.1",
+		"@commitlint/cli": "^13.1.0",
 		"@commitlint/config-conventional": "^13.1.0",
 		"@nodecraft/eslint-config": "^7.7.0",
 		"ava": "^3.15.0",
