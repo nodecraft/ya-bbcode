@@ -8,7 +8,7 @@ const yabbcode = function(config = {}){
 	this.config = {
 		newline: true,
 		paragraph: false,
-		cleanUnmatchable: true
+		cleanUnmatchable: true,
 	};
 	if(config.newline !== undefined){
 		this.config.newline = config.newline;
@@ -24,87 +24,87 @@ const yabbcode = function(config = {}){
 		'url': {
 			type: 'replace',
 			open: attr => `<a href="${attr || '#'}">`,
-			close: '</a>'
+			close: '</a>',
 		},
 		'quote': {
 			type: 'replace',
 			open: attr => `<blockquote author="${attr || ''}">`,
-			close: '</blockquote>'
+			close: '</blockquote>',
 		},
 		'b': {
 			type: 'replace',
 			open: '<strong>',
-			close: '</strong>'
+			close: '</strong>',
 		},
 		'u': {
 			type: 'replace',
 			open: '<u>',
-			close: '</u>'
+			close: '</u>',
 		},
 		'i': {
 			type: 'replace',
 			open: '<i>',
-			close: '</i>'
+			close: '</i>',
 		},
 		'h1': {
 			type: 'replace',
 			open: '<h1>',
-			close: '</h1>'
+			close: '</h1>',
 		},
 		'h2': {
 			type: 'replace',
 			open: '<h2>',
-			close: '</h2>'
+			close: '</h2>',
 		},
 		'h3': {
 			type: 'replace',
 			open: '<h3>',
-			close: '</h3>'
+			close: '</h3>',
 		},
 		'h4': {
 			type: 'replace',
 			open: '<h4>',
-			close: '</h4>'
+			close: '</h4>',
 		},
 		'h5': {
 			type: 'replace',
 			open: '<h5>',
-			close: '</h5>'
+			close: '</h5>',
 		},
 		'h6': {
 			type: 'replace',
 			open: '<h6>',
-			close: '</h6>'
+			close: '</h6>',
 		},
 		'code': {
 			type: 'replace',
 			open: '<code>',
-			close: '</code>'
+			close: '</code>',
 		},
 		'strike': {
 			type: 'replace',
 			open: '<span class="yabbcode-strike">',
-			close: '</span>'
+			close: '</span>',
 		},
 		'spoiler': {
 			type: 'replace',
 			open: '<span class="yabbcode-spoiler">',
-			close: '</span>'
+			close: '</span>',
 		},
 		'list': {
 			type: 'replace',
 			open: '<ul>',
-			close: '</ul>'
+			close: '</ul>',
 		},
 		'olist': {
 			type: 'replace',
 			open: '<ol>',
-			close: '</ol>'
+			close: '</ol>',
 		},
 		'*': {
 			type: 'replace',
 			open: '<li>',
-			close: null
+			close: null,
 		},
 		'img': {
 			type: 'content',
@@ -113,11 +113,11 @@ const yabbcode = function(config = {}){
 					return '';
 				}
 				return `<img src="${content}" alt="${attr || ''}"/>`;
-			}
+			},
 		},
 		'noparse': {
-			type: 'ignore'
-		}
+			type: 'ignore',
+		},
 	};
 	this.contentModules = {
 		replace: (tag, module, content) => {
@@ -171,13 +171,13 @@ const yabbcode = function(config = {}){
 			const contentStart = content.slice(0, Math.max(0, start));
 			const contentEnd = content.slice(end + closeTag.length);
 			return contentStart + innerContent + contentEnd;
-		}
+		},
 	};
 
 	this.regex = {
 		tags: /(\[[^\s\]^]+])/g,
 		newline: /\r\n|\r|\n/g,
-		placeholders: /\[TAG-[1-9]+]/g
+		placeholders: /\[TAG-[1-9]+]/g,
 	};
 };
 yabbcode.prototype._ignoreLoop = function(tagsMap, content){
@@ -201,7 +201,7 @@ yabbcode.prototype._contentLoop = function(tagsMap, content){
 			module = {
 				type: 'replace',
 				open: tag.raw,
-				close: tag.closing && tag.closing.raw || ''
+				close: tag.closing && tag.closing.raw || '',
 			};
 		}
 		if(!this.contentModules[module.type]){
@@ -290,6 +290,7 @@ yabbcode.prototype.registerTag = function(tag, options){
 
 yabbcode.prototype.parse = function(bbcInput){
 	if(typeof(bbcInput) === 'boolean' || typeof(bbcInput) !== 'string' && Number.isNaN(Number(bbcInput))){ return ''; }
+	// eslint-disable-next-line unicorn/prefer-spread
 	let input = String(bbcInput).slice(0); // cheap string clone
 	// reset
 	let tagsMap = [];
@@ -322,7 +323,7 @@ yabbcode.prototype.parse = function(bbcInput){
 			closing: null,
 			children: [],
 			parent: null,
-			matchTag: null
+			matchTag: null,
 		};
 		if(item.isClosing){
 			item.module = item.module.slice(1);

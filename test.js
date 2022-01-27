@@ -1,4 +1,5 @@
 'use strict';
+// eslint-disable-next-line node/no-missing-require
 const ava = require('ava');
 const yabbc = require('./ya-bbcode.js');
 
@@ -43,7 +44,7 @@ const bbcodes = {
 	'noparse_nested': '[noparse][url=https://nodecraft.com][img]https://nodecraft.com/assets/images/logo.png[/img][/url][/noparse]',
 	'noparse_unclosed': '[noparse][img]https://nodecraft.com/assets/images/logo.png[/img]',
 	'newline': newlineTest,
-	'newline_notag': newlineNoTagTest
+	'newline_notag': newlineNoTagTest,
 };
 
 ava('Bad yabbc instance', (test) => {
@@ -153,7 +154,7 @@ ava('Custom Tag, all functions', (test) => {
 	parser.registerTag('url', {
 		type: 'replace',
 		open: attr => `<a href="${attr || '#'}" rel="noopener nofollow" target="_blank">`,
-		close: () => '</a>'
+		close: () => '</a>',
 	});
 	test.is(parser.parse(bbcodes.url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
 });
@@ -162,7 +163,7 @@ ava('Custom Tag, all strings', (test) => {
 	parser.registerTag('nodecraft-url', {
 		type: 'replace',
 		open: `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`,
-		close: '</a>'
+		close: '</a>',
 	});
 	test.is(parser.parse(bbcodes.nodecraft_url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
 });
@@ -171,7 +172,7 @@ ava('Custom Tag, string open', (test) => {
 	parser.registerTag('nodecraft-url', {
 		type: 'replace',
 		open: `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`,
-		close: () => '</a>'
+		close: () => '</a>',
 	});
 	test.is(parser.parse(bbcodes.nodecraft_url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
 });
@@ -180,7 +181,7 @@ ava('Custom Tag, string close', (test) => {
 	parser.registerTag('nodecraft-url', {
 		type: 'replace',
 		open: () => `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`,
-		close: '</a>'
+		close: '</a>',
 	});
 	test.is(parser.parse(bbcodes.nodecraft_url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
 });
@@ -188,7 +189,7 @@ ava('Custom Tag, content with replace func', (test) => {
 	const parser = new yabbc();
 	parser.registerTag('pre', {
 		type: 'content',
-		replace: (attr, content) => `<pre>${content}</pre>`
+		replace: (attr, content) => `<pre>${content}</pre>`,
 	});
 	test.is(parser.parse(bbcodes.pre), '<pre>Minecraft is a really fun game!</pre>');
 });
@@ -196,7 +197,7 @@ ava('Custom Tag, content with string replace', (test) => {
 	const parser = new yabbc();
 	parser.registerTag('brand', {
 		type: 'content',
-		replace: 'Nodecraft'
+		replace: 'Nodecraft',
 	});
 	test.is(parser.parse(bbcodes.brand_replace), 'Nodecraft');
 });
@@ -205,7 +206,7 @@ ava('Custom Tag: Invalid Type', (test) => {
 	parser.registerTag('url', {
 		type: 'expand',
 		open: () => `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`,
-		close: () => '</a>'
+		close: () => '</a>',
 	});
 	test.throws(() => {
 		parser.parse(bbcodes.url);
