@@ -3,7 +3,6 @@ Yet another BBCode parser.
 `npm install ya-bbcode --save`
 
 [![npm version](https://badge.fury.io/js/ya-bbcode.svg)](https://badge.fury.io/js/ya-bbcode)
-[![dependencies Status](https://david-dm.org/nodecraft/ya-bbcode/status.svg)](https://david-dm.org/nodecraft/ya-bbcode)
 [![Actions Status](https://github.com/nodecraft/ya-bbcode/workflows/Test/badge.svg)](https://github.com/nodecraft/ya-bbcode/actions)
 [![Coverage Status](https://coveralls.io/repos/github/nodecraft/ya-bbcode/badge.svg)](https://coveralls.io/github/nodecraft/ya-bbcode)
 
@@ -11,9 +10,9 @@ Yet another BBCode parser.
 
 ```javascript
 const yabbcode = require('ya-bbcode');
-let parser = new yabbcode();
+const parser = new yabbcode();
 
-let bbc = '[url=https://nodecraft.com]Visit Nodecraft[/url]';
+const bbc = '[url=https://nodecraft.com]Visit Nodecraft[/url]';
 parser.parse(bbc);
 // <a href="https://nodecraft.com">Visit Nodecraft</a>
 ```

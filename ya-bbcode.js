@@ -1,26 +1,7 @@
 'use strict';
 
-const yabbcode = function(config = {}){
-	if(!(this instanceof yabbcode)){
-		return new yabbcode();
-	}
-	const self = this;
-	this.config = {
-		newline: true,
-		paragraph: false,
-		cleanUnmatchable: true,
-	};
-	if(config.newline !== undefined){
-		this.config.newline = config.newline;
-	}
-	if(config.paragraph !== undefined){
-		this.config.paragraph = config.paragraph;
-	}
-	if(config.cleanUnmatchable !== undefined){
-		this.config.cleanUnmatchable = config.cleanUnmatchable;
-	}
-
-	this.tags = {
+class yabbcode {
+	tags = {
 		'url': {
 			type: 'replace',
 			open: attr => `<a href="${attr || '#'}">`,
@@ -119,7 +100,12 @@ const yabbcode = function(config = {}){
 			type: 'ignore',
 		},
 	};
-	this.contentModules = {
+	regex = {
+		tags: /(\[[^\s\]^]+])/g,
+		newline: /\r\n|\r|\n/g,
+		placeholders: /\[TAG-[1-9]+]/g,
+	};
+	contentModules = {
 		replace: (tag, module, content) => {
 			let open = module.open;
 			let close = module.close;
@@ -167,179 +153,190 @@ const yabbcode = function(config = {}){
 				end = content.indexOf(closeTag);
 			}
 			let innerContent = content.slice(start + openTag.length, end);
-			innerContent = self._ignoreLoop(tag.children, innerContent);
+			innerContent = this.#ignoreLoop(tag.children, innerContent);
 			const contentStart = content.slice(0, Math.max(0, start));
 			const contentEnd = content.slice(end + closeTag.length);
 			return contentStart + innerContent + contentEnd;
 		},
 	};
-
-	this.regex = {
-		tags: /(\[[^\s\]^]+])/g,
-		newline: /\r\n|\r|\n/g,
-		placeholders: /\[TAG-[1-9]+]/g,
-	};
-};
-yabbcode.prototype._ignoreLoop = function(tagsMap, content){
-	for(const tag of tagsMap){
-		content = content.replace('[TAG-' + tag.index + ']', tag.raw);
-		if(tag.closing){
-			content = content.replace('[TAG-' + tag.closing.index + ']', tag.closing.raw);
+	constructor(config = {}){
+		this.config = {
+			newline: true,
+			paragraph: false,
+			cleanUnmatchable: true,
+		};
+		if(config.newline !== undefined){
+			this.config.newline = config.newline;
 		}
-		if(tag.children.length > 0){
-			content = this._ignoreLoop(tag.children, content);
+		if(config.paragraph !== undefined){
+			this.config.paragraph = config.paragraph;
 		}
-	}
-	return content;
-};
-
-yabbcode.prototype._contentLoop = function(tagsMap, content){
-	for(const tag of tagsMap){
-		let module = this.tags[tag.module];
-		if(!module){
-			// ignore invalid BBCode
-			module = {
-				type: 'replace',
-				open: tag.raw,
-				close: tag.closing && tag.closing.raw || '',
-			};
-		}
-		if(!this.contentModules[module.type]){
-			throw new Error("Cannot parse content block. Invalid block type [" + module.type + "] provided for tag [" + tag.module + "]");
-		}
-		content = this.contentModules[module.type](tag, module, content);
-		if(tag.children.length > 0 && module.type !== 'ignore'){
-			content = this._contentLoop(tag.children, content);
+		if(config.cleanUnmatchable !== undefined){
+			this.config.cleanUnmatchable = config.cleanUnmatchable;
 		}
 	}
 
-	return content;
-};
-
-yabbcode.prototype._tagLoop = function(tagsMap, parent){
-	let currentTagIndex = 0;
-	while(currentTagIndex < tagsMap.length){
-		let found = false;
-		if(tagsMap[currentTagIndex].matchTag !== null || tagsMap[currentTagIndex].isClosing){
-			currentTagIndex++;
-			continue; // already handled this tag / not closing
-		}
-		for(const [i, item] of tagsMap.entries()){
-			if(
-				found ||
-				tagsMap[currentTagIndex].matchTag !== null ||
-				item.index === tagsMap[currentTagIndex].index ||
-				item.matchTag !== null ||
-				!item.isClosing ||
-				tagsMap[currentTagIndex].module !== item.module
-			){
-				continue;
+	#ignoreLoop = function(tagsMap, content){
+		for(const tag of tagsMap){
+			content = content.replace('[TAG-' + tag.index + ']', tag.raw);
+			if(tag.closing){
+				content = content.replace('[TAG-' + tag.closing.index + ']', tag.closing.raw);
 			}
-			tagsMap[i].matchTag = tagsMap[currentTagIndex].index;
-			tagsMap[currentTagIndex].matchTag = item.index;
-			found = i; // next index
+			if(tag.children.length > 0){
+				content = this.#ignoreLoop(tag.children, content);
+			}
+		}
+		return content;
+	};
+
+	#contentLoop = function(tagsMap, content){
+		for(const tag of tagsMap){
+			let module = this.tags[tag.module];
+			if(!module){
+				// ignore invalid BBCode
+				module = {
+					type: 'replace',
+					open: tag.raw,
+					close: tag.closing && tag.closing.raw || '',
+				};
+			}
+			if(!this.contentModules[module.type]){
+				throw new Error("Cannot parse content block. Invalid block type [" + module.type + "] provided for tag [" + tag.module + "]");
+			}
+			content = this.contentModules[module.type](tag, module, content);
+			if(tag.children.length > 0 && module.type !== 'ignore'){
+				content = this.#contentLoop(tag.children, content);
+			}
 		}
 
-		const childStart = currentTagIndex + 1;
+		return content;
+	};
 
-		if(found !== false){
-			tagsMap[currentTagIndex].closing = tagsMap[tagsMap[currentTagIndex].matchTag];
-		}else{
-			tagsMap[currentTagIndex].matchTag = false;
-			found = tagsMap.length - 1;
+	#tagLoop = function(tagsMap, parent){
+		let currentTagIndex = 0;
+		while(currentTagIndex < tagsMap.length){
+			let found = false;
+			if(tagsMap[currentTagIndex].matchTag !== null || tagsMap[currentTagIndex].isClosing){
+				currentTagIndex++;
+				continue; // already handled this tag / not closing
+			}
+			for(const [i, item] of tagsMap.entries()){
+				if(
+					found ||
+					tagsMap[currentTagIndex].matchTag !== null ||
+					item.index === tagsMap[currentTagIndex].index ||
+					item.matchTag !== null ||
+					!item.isClosing ||
+					tagsMap[currentTagIndex].module !== item.module
+				){
+					continue;
+				}
+				tagsMap[i].matchTag = tagsMap[currentTagIndex].index;
+				tagsMap[currentTagIndex].matchTag = item.index;
+				found = i; // next index
+			}
+
+			const childStart = currentTagIndex + 1;
+
+			if(found !== false){
+				tagsMap[currentTagIndex].closing = tagsMap[tagsMap[currentTagIndex].matchTag];
+			}else{
+				tagsMap[currentTagIndex].matchTag = false;
+				found = tagsMap.length - 1;
+			}
+
+			// sweep children
+			if(childStart < found){
+				tagsMap[currentTagIndex].children = tagsMap.slice(childStart, found).map((child) => {
+					child.parent = tagsMap[currentTagIndex].index;
+					return child;
+				});
+			}
+
+			let i = childStart;
+			while(i < found){
+				tagsMap[i].parent = tagsMap[currentTagIndex].index;
+				i++;
+			}
+
+			currentTagIndex++; // move on
 		}
 
-		// sweep children
-		if(childStart < found){
-			tagsMap[currentTagIndex].children = tagsMap.slice(childStart, found).map((child) => {
-				child.parent = tagsMap[currentTagIndex].index;
-				return child;
-			});
-		}
+		// sweep children & matched closing tags
+		// TODO: make this more readable
+		tagsMap = tagsMap.filter(item => !((parent === undefined && item.parent !== null) || (item.parent !== null && item.parent !== parent) || item.isClosing));
 
-		let i = childStart;
-		while(i < found){
-			tagsMap[i].parent = tagsMap[currentTagIndex].index;
-			i++;
-		}
+		return tagsMap.map((tag) => {
+			if(tag.children.length > 0){
+				tag.children = this.#tagLoop(tag.children, tag.index);
+			}
+			return tag;
+		});
+	};
 
-		currentTagIndex++; // move on
+	clearTags(){
+		this.tags = {};
+		return this;
 	}
 
-	// sweep children & matched closing tags
-	// TODO: make this more readable
-	tagsMap = tagsMap.filter(item => !((parent === undefined && item.parent !== null) || (item.parent !== null && item.parent !== parent) || item.isClosing));
+	registerTag(tag, options){
+		this.tags[String(tag).toLowerCase()] = options;
+		return this;
+	}
 
-	return tagsMap.map((tag) => {
-		if(tag.children.length > 0){
-			tag.children = this._tagLoop(tag.children, tag.index);
+	parse(bbcInput){
+		if(typeof(bbcInput) === 'boolean' || typeof(bbcInput) !== 'string' && Number.isNaN(Number(bbcInput))){ return ''; }
+		// eslint-disable-next-line unicorn/prefer-spread
+		let input = String(bbcInput).slice(0); // cheap string clone
+		// reset
+		let tagsMap = [];
+		// split input into tags by index
+		const tags = String(input).match(this.regex.tags);
+
+		if(this.config.newline){
+			if(this.config.paragraph){
+				input = input.replace(this.regex.newline, "</p><p>");
+			}else{
+				input = input.replace(this.regex.newline, "<br/>");
+			}
 		}
-		return tag;
-	});
-};
-
-yabbcode.prototype.clearTags = function(){
-	this.tags = {};
-	return this;
-};
-
-yabbcode.prototype.registerTag = function(tag, options){
-	this.tags[String(tag).toLowerCase()] = options;
-	return this;
-};
-
-yabbcode.prototype.parse = function(bbcInput){
-	if(typeof(bbcInput) === 'boolean' || typeof(bbcInput) !== 'string' && Number.isNaN(Number(bbcInput))){ return ''; }
-	// eslint-disable-next-line unicorn/prefer-spread
-	let input = String(bbcInput).slice(0); // cheap string clone
-	// reset
-	let tagsMap = [];
-	// split input into tags by index
-	const tags = String(input).match(this.regex.tags);
-
-	if(this.config.newline){
 		if(this.config.paragraph){
-			input = input.replace(this.regex.newline, "</p><p>");
-		}else{
-			input = input.replace(this.regex.newline, "<br/>");
+			input = '<p>' + input + '</p>';
 		}
-	}
-	if(this.config.paragraph){
-		input = '<p>' + input + '</p>';
-	}
 
-	// handle when no tags are present
-	if(!tags || tags.length === 0){
+		// handle when no tags are present
+		if(!tags || tags.length === 0){
+			return input;
+		}
+		for(const [i, tag] of tags.entries()){
+			const parts = tag.slice(1, -1).split('=');
+			const item = {
+				index: i,
+				module: parts[0].toLowerCase(),
+				isClosing: tag.slice(1, 2) === '/',
+				raw: tag,
+				attr: parts[1],
+				closing: null,
+				children: [],
+				parent: null,
+				matchTag: null,
+			};
+			if(item.isClosing){
+				item.module = item.module.slice(1);
+			}
+
+			tagsMap.push(item);
+			input = input.replace(tag, '[TAG-' + i + ']'); // placeholder for tag
+		}
+		// loop through each tag to create nested elements
+		tagsMap = this.#tagLoop(tagsMap);
+		// put back all non-found matches?
+		input = this.#contentLoop(tagsMap, input);
+		if(this.config.cleanUnmatchable){
+			input = input.replace(this.regex.placeholders, '');
+		}
 		return input;
 	}
-	for(const [i, tag] of tags.entries()){
-		const parts = tag.slice(1, -1).split('=');
-		const item = {
-			index: i,
-			module: parts[0].toLowerCase(),
-			isClosing: tag.slice(1, 2) === '/',
-			raw: tag,
-			attr: parts[1],
-			closing: null,
-			children: [],
-			parent: null,
-			matchTag: null,
-		};
-		if(item.isClosing){
-			item.module = item.module.slice(1);
-		}
-
-		tagsMap.push(item);
-		input = input.replace(tag, '[TAG-' + i + ']'); // placeholder for tag
-	}
-	// loop through each tag to create nested elements
-	tagsMap = this._tagLoop(tagsMap);
-	// put back all non-found matches?
-	input = this._contentLoop(tagsMap, input);
-	if(this.config.cleanUnmatchable){
-		input = input.replace(this.regex.placeholders, '');
-	}
-	return input;
-};
+}
 
 module.exports = yabbcode;

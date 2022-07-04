@@ -47,9 +47,6 @@ const bbcodes = {
 	'newline_notag': newlineNoTagTest,
 };
 
-ava('Bad yabbc instance', (test) => {
-	test.is(yabbc().parse(bbcodes.none), bbcodes.none);
-});
 ava('No BBCode', (test) => {
 	const parser = new yabbc();
 	test.is(parser.parse(bbcodes.none), bbcodes.none);
