@@ -18,6 +18,7 @@ const bbcodes = {
 	'nested_deep': '[url=https://nodecraft.com][b]Game Servers [u][i]Done Right[/i][/u][/b][/url]',
 	'url': '[url=https://nodecraft.com]Visit Nodecraft[/url]',
 	'url_no_attr': '[url]Visit Nodecraft[/url]',
+	'url_with_query': '[url=https://nodecraft.com?foobar=foo]Visit Nodecraft[/url]',
 	'nodecraft_url': '[nodecraft-url][/nodecraft-url]',
 	'pre': '[pre]Minecraft is a really fun game![/pre]',
 	'quote': '[quote=Nodecraft]Game Servers Done Right![/quote]',
@@ -81,6 +82,7 @@ ava('Tag: url', (test) => {
 	const parser = new yabbc();
 	test.is(parser.parse(bbcodes.url), '<a href="https://nodecraft.com">Visit Nodecraft</a>');
 	test.is(parser.parse(bbcodes.url_no_attr), '<a href="#">Visit Nodecraft</a>');
+	test.is(parser.parse(bbcodes.url_with_query), '<a href="https://nodecraft.com?foobar=foo">Visit Nodecraft</a>');
 });
 ava('Tag: quote', (test) => {
 	const parser = new yabbc();

@@ -315,7 +315,7 @@ class yabbcode {
 				module: parts[0].toLowerCase(),
 				isClosing: tag.slice(1, 2) === '/',
 				raw: tag,
-				attr: parts[1],
+				attr: parts.slice(1).join('='),
 				closing: null,
 				children: [],
 				parent: null,
