@@ -39,7 +39,7 @@
 		"@commitlint/cli": "^17.1.2",
 		"@commitlint/config-conventional": "^17.1.0",
 		"@nodecraft/eslint-config": "^20.1.0",
-		"ava": "^4.3.3",
+		"ava": "^5.0.1",
 		"coveralls": "^3.1.1",
 		"eslint": "^8.25.0",
 		"eslint-plugin-json": "^3.1.0",
