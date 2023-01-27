@@ -101,7 +101,7 @@ class yabbcode {
 		},
 	};
 	regex = {
-		tags: /(\[[^\s\]^]+])/g,
+		tags: /(\[[^\]^]+])/g,
 		newline: /\r\n|\r|\n/g,
 		placeholders: /\[TAG-[1-9]+]/g,
 	};

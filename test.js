@@ -23,6 +23,7 @@ const bbcodes = {
 	'pre': '[pre]Minecraft is a really fun game![/pre]',
 	'quote': '[quote=Nodecraft]Game Servers Done Right![/quote]',
 	'quote_no_attr': '[quote]Game Servers Done Right![/quote]',
+	'quote_with_space_in_attr': '[quote=Some user]Game Servers Done Right![/quote]',
 	'brand_replace': '[brand][/brand]',
 	'b': '[b]Game Servers Done Right![/b]',
 	'u': '[u]Game Servers Done Right![/u]',
@@ -88,6 +89,7 @@ ava('Tag: quote', (test) => {
 	const parser = new yabbc();
 	test.is(parser.parse(bbcodes.quote), '<blockquote author="Nodecraft">Game Servers Done Right!</blockquote>');
 	test.is(parser.parse(bbcodes.quote_no_attr), '<blockquote author="">Game Servers Done Right!</blockquote>');
+	test.is(parser.parse(bbcodes.quote_with_space_in_attr), '<blockquote author="Some user">Game Servers Done Right!</blockquote>');
 });
 ava('Tag: b', (test) => {
 	const parser = new yabbc();
