@@ -37,7 +37,7 @@ const bbcodes = {
 	'code': '[code]new yabbcode();[/code]',
 	'strike': '[strike]getnodecraft.net[/strike]',
 	'spoiler': '[spoiler]The cake is a lie[/spoiler]',
-	'list': "[list][*] Minecraft Servers[*] ARK Servers[*] PixARK Servers[*] Rust Servers[/list]",
+	'list': '[list][*] Minecraft Servers[*] ARK Servers[*] PixARK Servers[*] Rust Servers[/list]',
 	'olist': '[olist][*] Pick your games[*] Create your bot[*] Get ingame![/olist]',
 	'img': '[img=Nodecraft]https://nodecraft.com/assets/images/logo.png[/img]',
 	'img_no_attr': '[img]https://nodecraft.com/assets/images/logo.png[/img]',
@@ -163,7 +163,7 @@ ava('Custom Tag, all strings', (test) => {
 	const parser = new yabbc();
 	parser.registerTag('nodecraft-url', {
 		type: 'replace',
-		open: `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`,
+		open: '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft',
 		close: '</a>',
 	});
 	test.is(parser.parse(bbcodes.nodecraft_url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
@@ -172,7 +172,7 @@ ava('Custom Tag, string open', (test) => {
 	const parser = new yabbc();
 	parser.registerTag('nodecraft-url', {
 		type: 'replace',
-		open: `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`,
+		open: '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft',
 		close: () => '</a>',
 	});
 	test.is(parser.parse(bbcodes.nodecraft_url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
@@ -181,7 +181,7 @@ ava('Custom Tag, string close', (test) => {
 	const parser = new yabbc();
 	parser.registerTag('nodecraft-url', {
 		type: 'replace',
-		open: () => `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`,
+		open: () => '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft',
 		close: '</a>',
 	});
 	test.is(parser.parse(bbcodes.nodecraft_url), '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft</a>');
@@ -206,7 +206,7 @@ ava('Custom Tag: Invalid Type', (test) => {
 	const parser = new yabbc();
 	parser.registerTag('url', {
 		type: 'expand',
-		open: () => `<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft`,
+		open: () => '<a href="https://nodecraft.com" rel="noopener nofollow" target="_blank">Visit Nodecraft',
 		close: () => '</a>',
 	});
 	test.throws(() => {
