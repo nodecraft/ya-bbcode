@@ -47,6 +47,7 @@ const bbcodes = {
 	'noparse_unclosed': '[noparse][img]https://nodecraft.com/assets/images/logo.png[/img]',
 	'newline': newlineTest,
 	'newline_notag': newlineNoTagTest,
+	'html': '<strong>Nodecraft</strong>',
 };
 
 ava('No BBCode', (test) => {
@@ -241,4 +242,12 @@ ava('Clear tags', (test) => {
 	const parser = new yabbc();
 	parser.clearTags();
 	test.is(parser.parse(bbcodes.b), '[b]Game Servers Done Right![/b]');
+});
+ava('Sanitize HTML', (test) => {
+	const parser = new yabbc();
+	test.is(parser.parse(bbcodes.html), '&lt;strong&gt;Nodecraft&lt;/strong&gt;');
+});
+ava('Do not sanitize HTML', (test) => {
+	const parser = new yabbc({sanitizeHtml: false});
+	test.is(parser.parse(bbcodes.html), '<strong>Nodecraft</strong>');
 });

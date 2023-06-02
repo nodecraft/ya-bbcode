@@ -8,6 +8,7 @@ declare class yabbcode {
 		newline?: boolean
 		paragraph?: boolean
 		cleanUnmatchable?: boolean
+		sanitizeHtml?: boolean
 	})
 	/**
 	 * Parse bbcode

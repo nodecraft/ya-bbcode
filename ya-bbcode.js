@@ -164,6 +164,7 @@ class yabbcode {
 			newline: true,
 			paragraph: false,
 			cleanUnmatchable: true,
+			sanitizeHtml: true,
 		};
 		if(config.newline !== undefined) {
 			this.config.newline = config.newline;
@@ -173,6 +174,9 @@ class yabbcode {
 		}
 		if(config.cleanUnmatchable !== undefined) {
 			this.config.cleanUnmatchable = config.cleanUnmatchable;
+		}
+		if(config.sanitizeHtml !== undefined) {
+			this.config.sanitizeHtml = config.sanitizeHtml;
 		}
 	}
 
@@ -288,6 +292,15 @@ class yabbcode {
 		if(typeof(bbcInput) === 'boolean' || typeof(bbcInput) !== 'string' && Number.isNaN(Number(bbcInput))) { return ''; }
 		// eslint-disable-next-line unicorn/prefer-spread
 		let input = String(bbcInput).slice(0); // cheap string clone
+		if(this.config.sanitizeHtml) {
+			input = input
+				.replaceAll('&', '&amp;')
+				.replaceAll('<', '&lt;')
+				.replaceAll('>', '&gt;')
+				.replaceAll('"', '&quot;')
+				.replaceAll('\'', '&#39;');
+		}
+
 		// reset
 		let tagsMap = [];
 		// split input into tags by index
