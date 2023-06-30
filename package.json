@@ -25,9 +25,10 @@
 		"ya-bbcode.d.ts"
 	],
 	"scripts": {
+		"coverage": "npm run test -- --coverage",
 		"lint": "eslint . --fix",
 		"prepare": "husky install",
-		"test": "npm run lint && vitest run --coverage"
+		"test": "vitest run"
 	},
 	"lint-staged": {
 		"*.js": "eslint --cache"
