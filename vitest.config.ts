@@ -6,7 +6,8 @@ export default defineConfig({
 		hookTimeout: 10000,
 		teardownTimeout: 10000,
 		coverage: {
-			provider: 'istanbul',
+			reporter: 'lcov',
+			provider: 'v8',
 		},
 	},
 });

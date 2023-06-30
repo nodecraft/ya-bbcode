@@ -30,4 +30,4 @@ jobs:
         with:
           github-token: ${{ secrets.github_token }}
           format: lcov
-          file: coverage/lcov.info
+          file: "./coverage/lcov.info"
