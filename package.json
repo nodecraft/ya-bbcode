@@ -25,28 +25,30 @@
 		"ya-bbcode.d.ts"
 	],
 	"scripts": {
-		"coverage": "nyc report --reporter=lcov",
+		"coverage": "npm run test -- --coverage",
 		"lint": "eslint . --fix",
-		"nyc": "nyc ava",
 		"prepare": "husky install",
-		"test": "npm run lint && nyc ava"
+		"test": "vitest run"
 	},
 	"lint-staged": {
 		"*.js": "eslint --cache"
 	},
 	"devDependencies": {
-		"@commitlint/cli": "^17.6.5",
-		"@commitlint/config-conventional": "^17.6.5",
-		"@nodecraft/eslint-config": "^25.0.1",
-		"ava": "^5.3.0",
-		"coveralls": "^3.1.1",
-		"eslint": "^8.41.0",
-		"eslint-plugin-json": "^3.1.0",
-		"eslint-plugin-node": "^11.1.0",
-		"eslint-plugin-unicorn": "^47.0.0",
-		"husky": "^8.0.3",
-		"lint-staged": "^13.2.2",
-		"nyc": "^15.1.0"
+		"@commitlint/cli": "17.6.5",
+		"@commitlint/config-conventional": "17.6.5",
+		"@nodecraft/eslint-config": "25.0.1",
+		"@typescript-eslint/eslint-plugin": "5.60.1",
+		"@typescript-eslint/parser": "5.60.1",
+		"@vitest/coverage-v8": "0.32.2",
+		"coveralls": "3.1.1",
+		"eslint": "8.41.0",
+		"eslint-plugin-json": "3.1.0",
+		"eslint-plugin-node": "11.1.0",
+		"eslint-plugin-unicorn": "47.0.0",
+		"husky": "8.0.3",
+		"lint-staged": "13.2.2",
+		"typescript": "5.1.6",
+		"vitest": "0.32.2"
 	},
 	"engines": {
 		"node": ">=16",

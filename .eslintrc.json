@@ -1,7 +1,11 @@
 {
 	"extends": [
-		"@nodecraft"
+		"@nodecraft/eslint-config/typescript"
 	],
+	"parserOptions": {
+		"sourceType": "module",
+		"ecmaVersion": 2022
+	},
 	"plugins": [
 		"json",
 		"node",

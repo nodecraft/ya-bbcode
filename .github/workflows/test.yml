@@ -23,9 +23,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
       - run: npm ci
-      - run: npm test
+      - run: npm run lint
       - run: npm run coverage
       - name: Coveralls
-        uses: coverallsapp/github-action@master
+        uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.github_token }}
+          format: lcov
+          file: "./coverage/lcov.info"
