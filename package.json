@@ -34,7 +34,7 @@
 		"*.js": "eslint --cache"
 	},
 	"devDependencies": {
-		"@commitlint/cli": "17.6.6",
+		"@commitlint/cli": "17.6.7",
 		"@commitlint/config-conventional": "17.6.6",
 		"@nodecraft/eslint-config": "27.0.0",
 		"@typescript-eslint/eslint-plugin": "6.0.0",
