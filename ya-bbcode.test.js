@@ -1,4 +1,4 @@
-import {describe, expect, it} from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import yabbc from './ya-bbcode';
 
@@ -216,27 +216,27 @@ describe('ya-bbcode', () => {
 		}).toThrowError(/Cannot parse content block/);
 	});
 	it('New line: converted', () => {
-		const parser = new yabbc({newline: true});
+		const parser = new yabbc({ newline: true });
 		expect(parser.parse(bbcodes.newline)).toBe('<h1>Nodecraft</h1><br/><strong>Game Servers Done Right</strong>');
 	});
 	it('New line: retained', () => {
-		const parser = new yabbc({newline: false});
+		const parser = new yabbc({ newline: false });
 		expect(parser.parse(bbcodes.newline)).toBe('<h1>Nodecraft</h1>\n<strong>Game Servers Done Right</strong>');
 	});
 	it('New line: converted with no tag', () => {
-		const parser = new yabbc({newline: true});
+		const parser = new yabbc({ newline: true });
 		expect(parser.parse(bbcodes.newline_notag)).toBe('Nodecraft<br/>Game Servers Done Right');
 	});
 	it('Paragraph: enabled', () => {
-		const parser = new yabbc({newline: true, paragraph: true});
+		const parser = new yabbc({ newline: true, paragraph: true });
 		expect(parser.parse(bbcodes.newline)).toBe('<p><h1>Nodecraft</h1></p><p><strong>Game Servers Done Right</strong></p>');
 	});
 	it('Clean unmatchable: cleaned', () => {
-		const parser = new yabbc({cleanUnmatchable: true});
+		const parser = new yabbc({ cleanUnmatchable: true });
 		expect(parser.parse(bbcodes.unmatchable)).toBe('<strong>Game Servers Done Right!</strong>');
 	});
 	it('Clean unmatchable: retained', () => {
-		const parser = new yabbc({cleanUnmatchable: false});
+		const parser = new yabbc({ cleanUnmatchable: false });
 		expect(parser.parse(bbcodes.unmatchable)).toBe('<strong>Game Servers Done Right![TAG-1]</strong>');
 	});
 	it('Clear tags', () => {
@@ -249,7 +249,7 @@ describe('ya-bbcode', () => {
 		expect(parser.parse(bbcodes.html)).toBe('&lt;strong&gt;Nodecraft&lt;/strong&gt;');
 	});
 	it('Do not sanitize HTML', () => {
-		const parser = new yabbc({sanitizeHtml: false});
+		const parser = new yabbc({ sanitizeHtml: false });
 		expect(parser.parse(bbcodes.html)).toBe('<strong>Nodecraft</strong>');
 	});
 });
