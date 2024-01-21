@@ -199,7 +199,7 @@ class yabbcode {
 				module = {
 					type: 'replace',
 					open: tag.raw,
-					close: tag.closing && tag.closing.raw || '',
+					close: tag.closing ? tag.closing.raw : '',
 				};
 			}
 			if (!this.contentModules[module.type]) {
@@ -287,7 +287,10 @@ class yabbcode {
 	}
 
 	parse(bbcInput) {
-		if (typeof(bbcInput) === 'boolean' || typeof(bbcInput) !== 'string' && Number.isNaN(Number(bbcInput))) { return ''; }
+		if (
+			typeof(bbcInput) === 'boolean'
+			|| (typeof(bbcInput) !== 'string' && Number.isNaN(Number(bbcInput)))
+		) { return ''; }
 		// eslint-disable-next-line unicorn/prefer-spread
 		let input = String(bbcInput).slice(0); // cheap string clone
 		if (this.config.sanitizeHtml) {
