@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - name: Restore NPM cache
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         continue-on-error: true
         with:
           path: ~/.npm
