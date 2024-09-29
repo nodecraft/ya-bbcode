@@ -34,21 +34,21 @@
 		"*.js": "eslint --cache"
 	},
 	"devDependencies": {
-		"@commitlint/cli": "19.4.1",
-		"@commitlint/config-conventional": "19.4.1",
-		"@nodecraft/eslint-config": "43.0.1",
-		"@typescript-eslint/eslint-plugin": "8.3.0",
-		"@typescript-eslint/parser": "8.3.0",
-		"@vitest/coverage-v8": "2.0.5",
+		"@commitlint/cli": "19.5.0",
+		"@commitlint/config-conventional": "19.5.0",
+		"@nodecraft/eslint-config": "43.1.0",
+		"@typescript-eslint/eslint-plugin": "8.7.0",
+		"@typescript-eslint/parser": "8.7.0",
+		"@vitest/coverage-v8": "2.1.1",
 		"coveralls": "3.1.1",
 		"eslint": "8.57.0",
 		"eslint-plugin-json": "4.0.1",
 		"eslint-plugin-node": "11.1.0",
 		"eslint-plugin-unicorn": "55.0.0",
-		"husky": "9.1.5",
-		"lint-staged": "15.2.9",
-		"typescript": "5.5.4",
-		"vitest": "2.0.5"
+		"husky": "9.1.6",
+		"lint-staged": "15.2.10",
+		"typescript": "5.6.2",
+		"vitest": "2.1.1"
 	},
 	"engines": {
 		"node": ">=18",
