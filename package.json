@@ -38,7 +38,7 @@
 		"@commitlint/config-conventional": "19.5.0",
 		"@nodecraft/eslint-config": "43.1.0",
 		"@typescript-eslint/eslint-plugin": "8.7.0",
-		"@typescript-eslint/parser": "8.7.0",
+		"@typescript-eslint/parser": "8.8.1",
 		"@vitest/coverage-v8": "2.1.1",
 		"coveralls": "3.1.1",
 		"eslint": "8.57.0",
