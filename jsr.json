@@ -1,0 +1,9 @@
+{
+	"name": "@nodecraft/ya-bbcode",
+	"version": "4.0.0",
+	"exports": "./ya-bbcode.js",
+	"include": [
+		"ya-bbcode.js",
+		"ya-bbcode.d.ts"
+	]
+}
