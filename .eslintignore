@@ -1,3 +1,8 @@
-node_modules/**
-build/**
-coverage/**
+# Build output
+dist/
+coverage/
+node_modules/
+
+# Generated files
+*.d.ts
+*.tsbuildinfo

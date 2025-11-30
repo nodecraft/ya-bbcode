@@ -1,11 +1,34 @@
 {
 	"compilerOptions": {
-		"target": "ES2022",
-		"module": "ES2020",
-		"moduleResolution": "node",
-		"lib": ["ES2020"],
+		"target": "ES2024",
+		"module": "ESNext",
+		"lib": ["ES2024"],
+		"moduleResolution": "bundler",
+		"types": ["node"],
+
+		// Strict type checking
+		"strict": true,
+		"noUncheckedIndexedAccess": true,
+		"exactOptionalPropertyTypes": true,
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitReturns": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+
+		// Module options
 		"esModuleInterop": true,
+		"allowSyntheticDefaultImports": true,
+		"verbatimModuleSyntax": true,
 		"resolveJsonModule": true,
-		"skipLibCheck": true
+		"allowImportingTsExtensions": true,
+
+		// Type checking only (tsdown handles building)
+		"noEmit": true,
+
+		// Other
+		"skipLibCheck": true,
+		"forceConsistentCasingInFileNames": true
 	},
+	"include": ["**/*.ts"],
+	"exclude": ["node_modules", "dist", "test-imports"]
 }
