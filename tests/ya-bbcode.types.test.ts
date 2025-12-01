@@ -5,6 +5,7 @@ import yabbcode, {
 	type ContentTag,
 	type IgnoreTag,
 	type ReplaceTag,
+	type TagAttributes,
 	type TagDefinition,
 } from '../src/ya-bbcode';
 
@@ -54,6 +55,33 @@ describe('Type exports', () => {
 			close: null,
 		};
 		expectTypeOf(nullCloseTag).toEqualTypeOf<ReplaceTag>();
+
+		// With autoClose (for implicit closing like list items)
+		const autoCloseTag: ReplaceTag = {
+			type: 'replace',
+			open: '<li>',
+			close: null,
+			autoClose: '</li>',
+		};
+		expectTypeOf(autoCloseTag).toEqualTypeOf<ReplaceTag>();
+
+		// With autoClose as function
+		const autoCloseFuncTag: ReplaceTag = {
+			type: 'replace',
+			open: '<li>',
+			close: null,
+			autoClose: () => '</li>',
+		};
+		expectTypeOf(autoCloseFuncTag).toEqualTypeOf<ReplaceTag>();
+
+		// With autoClose function using attrs parameter
+		const autoCloseWithAttrsTag: ReplaceTag = {
+			type: 'replace',
+			open: (_attr: string, attrs: TagAttributes) => `<li class="${attrs.class || ''}">`,
+			close: null,
+			autoClose: (_attr: string, _attrs: TagAttributes) => '</li>',
+		};
+		expectTypeOf(autoCloseWithAttrsTag).toEqualTypeOf<ReplaceTag>();
 	});
 
 	it('should export ContentTag type correctly', () => {
