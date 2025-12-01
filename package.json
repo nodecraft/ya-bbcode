@@ -55,7 +55,7 @@
 		"eslint": "8.57.1",
 		"eslint-plugin-json": "4.0.1",
 		"eslint-plugin-node": "11.1.0",
-		"eslint-plugin-unicorn": "56.0.1",
+		"eslint-plugin-unicorn": "62.0.0",
 		"tinybench": "5.1.0",
 		"tsdown": "0.17.0-beta.4",
 		"typescript": "5.9.3",
