@@ -57,7 +57,7 @@
 		"eslint-plugin-node": "11.1.0",
 		"eslint-plugin-unicorn": "56.0.1",
 		"tinybench": "5.1.0",
-		"tsdown": "0.17.0-beta.4",
+		"tsdown": "0.17.2",
 		"typescript": "5.9.3",
 		"vitest": "4.0.14",
 		"xbbcode-parser": "0.3.1"
