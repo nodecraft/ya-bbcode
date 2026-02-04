@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.1.0
+
+- Added `autoClose` property for tags that implicitly close (fixes [#214](https://github.com/nodecraft/ya-bbcode/issues/214))
+- List items (`[*]`) now automatically generate closing `</li>` tags
+- Added `[hr]` tag for horizontal rules (Steam BBCode compatibility)
+
 ## 5.0.0
 
 ### Major Changes

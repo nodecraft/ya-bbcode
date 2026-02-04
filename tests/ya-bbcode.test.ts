@@ -34,6 +34,8 @@ const bbcodes = {
 	h5: '[h5]Game Servers Done Right![/h5]',
 	h6: '[h6]Game Servers Done Right![/h6]',
 	code: '[code]new yabbcode();[/code]',
+	hr: '[hr][/hr]',
+	hr_standalone: '[hr]',
 	strike: '[strike]getnodecraft.net[/strike]',
 	spoiler: '[spoiler]The cake is a lie[/spoiler]',
 	list: '[list][*] Minecraft Servers[*] ARK Servers[*] PixARK Servers[*] Rust Servers[/list]',
@@ -122,6 +124,15 @@ describe('ya-bbcode', () => {
 		const parser = new yabbc();
 		expect(parser.parse(bbcodes.code)).toBe('<code>new yabbcode();</code>');
 	});
+	it('Tag: hr', () => {
+		const parser = new yabbc();
+		// Steam-style [hr][/hr]
+		expect(parser.parse(bbcodes.hr)).toBe('<hr/>');
+		// Standalone [hr] without closing tag
+		expect(parser.parse(bbcodes.hr_standalone)).toBe('<hr/>');
+		// With surrounding content
+		expect(parser.parse('Above[hr][/hr]Below')).toBe('Above<hr/>Below');
+	});
 	it('Tag: strike', () => {
 		const parser = new yabbc();
 		expect(parser.parse(bbcodes.strike)).toBe('<span class="yabbcode-strike">getnodecraft.net</span>');
@@ -132,11 +143,11 @@ describe('ya-bbcode', () => {
 	});
 	it('Tag: list', () => {
 		const parser = new yabbc();
-		expect(parser.parse(bbcodes.list)).toBe('<ul><li> Minecraft Servers<li> ARK Servers<li> PixARK Servers<li> Rust Servers</ul>');
+		expect(parser.parse(bbcodes.list)).toBe('<ul><li> Minecraft Servers</li><li> ARK Servers</li><li> PixARK Servers</li><li> Rust Servers</li></ul>');
 	});
 	it('Tag: olist', () => {
 		const parser = new yabbc();
-		expect(parser.parse(bbcodes.olist)).toBe('<ol><li> Pick your games<li> Create your bot<li> Get ingame!</ol>');
+		expect(parser.parse(bbcodes.olist)).toBe('<ol><li> Pick your games</li><li> Create your bot</li><li> Get ingame!</li></ol>');
 	});
 	it('Tag: img', () => {
 		const parser = new yabbc();
@@ -346,6 +357,60 @@ describe('ya-bbcode', () => {
 		// Simple attribute syntax with = should work
 		expect(parser.parse('[quote=John]Hello[/quote]')).toBe('<blockquote author="John">Hello</blockquote>');
 		expect(parser.parse('[url=https://example.com]Link[/url]')).toBe('<a href="https://example.com">Link</a>');
+	});
+	it('Custom tag with autoClose', () => {
+		const parser = new yabbc();
+		// Register a custom tag with autoClose for implicit closing
+		parser.registerTag('item', {
+			type: 'replace',
+			open: '<div class="item">',
+			close: null,
+			autoClose: '</div>',
+		});
+		parser.registerTag('container', {
+			type: 'replace',
+			open: '<div class="container">',
+			close: '</div>',
+		});
+		// autoClose should insert </div> before next sibling and before parent close
+		expect(parser.parse('[container][item]one[item]two[/container]')).toBe('<div class="container"><div class="item">one</div><div class="item">two</div></div>');
+	});
+	it('List items without explicit closing tags (Steam BBCode format)', () => {
+		const parser = new yabbc();
+		// This tests the fix for issue #214 - auto-closing list items
+		const input = `[list]
+[*]First item
+[*]Second item
+[*]Third item
+[/list]`;
+		const result = parser.parse(input);
+		// Each list item should have a closing </li> tag
+		expect(result).toContain('<li>');
+		expect(result).toContain('</li>');
+		// Count opening and closing tags - should be equal
+		const openCount = (result.match(/<li>/g) || []).length;
+		const closeCount = (result.match(/<\/li>/g) || []).length;
+		expect(openCount).toBe(3);
+		expect(closeCount).toBe(3);
+	});
+
+	it('list items with explicit closing tags', () => {
+		const parser = new yabbc();
+		// This tests that explicit closing tags still work as expected
+		const input = `[list]
+[*]First item[/*]
+[*]Second item[/*]
+[*]Third item[/*]
+[/list]`;
+		const result = parser.parse(input);
+		// Each list item should have a closing </li> tag
+		expect(result).toContain('<li>');
+		expect(result).toContain('</li>');
+		// Count opening and closing tags - should be equal
+		const openCount = (result.match(/<li>/g) || []).length;
+		const closeCount = (result.match(/<\/li>/g) || []).length;
+		expect(openCount).toBe(3);
+		expect(closeCount).toBe(3);
 	});
 });
 

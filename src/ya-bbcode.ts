@@ -16,6 +16,11 @@ interface ReplaceTag {
 	type: 'replace';
 	open: ((attr: string, attrs: TagAttributes) => string) | string;
 	close: ((attr: string, attrs: TagAttributes) => string) | string | null;
+	/**
+	 * HTML to insert when the tag implicitly closes (e.g., before next sibling or parent close).
+	 * Useful for tags like [*] that don't have explicit closing tags in BBCode.
+	 */
+	autoClose?: ((attr: string, attrs: TagAttributes) => string) | string;
 }
 
 interface ContentTag {
@@ -215,6 +220,11 @@ class yabbcode {
 			open: '<code>',
 			close: '</code>',
 		},
+		'hr': {
+			type: 'replace',
+			open: '<hr/>',
+			close: null,
+		},
 		'strike': {
 			type: 'replace',
 			open: '<span class="yabbcode-strike">',
@@ -238,7 +248,8 @@ class yabbcode {
 		'*': {
 			type: 'replace',
 			open: '<li>',
-			close: null,
+			close: '</li>',
+			autoClose: '</li>',
 		},
 		'img': {
 			type: 'content',
@@ -355,23 +366,29 @@ class yabbcode {
 		return content;
 	}
 
-	#contentLoop(tagsMap: TagItem[], content: string): string {
+	#contentLoop(tagsMap: TagItem[], content: string, parentClosingTagIndex?: number): string {
 		// Adaptive threshold: use optimized path for large documents (>50 tags)
-		// Only optimize when all tags are replace-type (most common case for large docs)
+		// Only optimize when all tags are replace-type and none have autoClose
 		if (tagsMap.length > 50) {
-			// Check if we have any content or ignore type tags
+			// Check if we have any content, ignore type, or autoClose tags
 			const hasSpecialTypes = tagsMap.some((tag) => {
 				const module = this.tags[tag.module];
-				return module && (module.type === 'content' || module.type === 'ignore');
+				if (!module) { return false; }
+				if (module.type === 'content' || module.type === 'ignore') { return true; }
+				if (module.type === 'replace' && (module as ReplaceTag).autoClose) { return true; }
+				return false;
 			});
 
-			// If only replace-type tags, use optimized single-pass approach
+			// If only replace-type tags without autoClose, use optimized single-pass approach
 			if (!hasSpecialTypes) {
 				return this.#contentLoopOptimized(tagsMap, content);
 			}
 		}
 
-		for (const tag of tagsMap) {
+		for (let i = 0; i < tagsMap.length; i++) {
+			const tag = tagsMap[i];
+			if (!tag) { continue; }
+
 			let module = this.tags[tag.module];
 			if (!module) {
 				// ignore invalid BBCode
@@ -384,15 +401,59 @@ class yabbcode {
 			if (!this.contentModules[module.type]) {
 				throw new Error('Cannot parse content block. Invalid block type [' + module.type + '] provided for tag [' + tag.module + ']');
 			}
+
 			if (module.type === 'replace') {
-				content = this.contentModules.replace(tag, module, content);
+				const replaceModule = module as ReplaceTag;
+
+				// Step 1: Process opening tag
+				let open = replaceModule.open;
+				if (typeof(open) === 'function') {
+					open = open(tag.attr, tag.attrs);
+				}
+				if (open && !tag.isClosing) {
+					content = content.replace('[TAG-' + tag.index + ']', open);
+				}
+
+				// Step 2: Process children (before closing, so parent's close placeholder is still available)
+				if (tag.children.length > 0) {
+					const closingIndex = tag.closing?.index;
+					content = this.#contentLoop(tag.children, content, closingIndex);
+				}
+
+				// Step 3: Handle autoClose for tags without explicit closing
+				if (replaceModule.autoClose && !tag.closing) {
+					let autoClose = replaceModule.autoClose;
+					if (typeof(autoClose) === 'function') {
+						autoClose = autoClose(tag.attr, tag.attrs);
+					}
+
+					// Find insertion point: before next sibling or parent close
+					let insertBefore: string | undefined;
+					const nextTag = tagsMap[i + 1];
+					if (nextTag) {
+						insertBefore = '[TAG-' + nextTag.index + ']';
+					} else if (parentClosingTagIndex !== undefined) {
+						insertBefore = '[TAG-' + parentClosingTagIndex + ']';
+					}
+
+					if (insertBefore && autoClose) {
+						content = content.replace(insertBefore, autoClose + insertBefore);
+					}
+				}
+
+				// Step 4: Process closing tag (after children)
+				let close = replaceModule.close;
+				if (typeof(close) === 'function') {
+					close = close(tag.attr, tag.attrs);
+				}
+				if (close && tag.closing) {
+					content = content.replace('[TAG-' + tag.closing.index + ']', close);
+				}
+
 			} else if (module.type === 'content') {
-				content = this.contentModules.content(tag, module, content);
+				content = this.contentModules.content(tag, module as ContentTag, content);
 			} else if (module.type === 'ignore') {
-				content = this.contentModules.ignore(tag, module, content);
-			}
-			if (tag.children.length > 0 && module.type !== 'ignore') {
-				content = this.#contentLoop(tag.children, content);
+				content = this.contentModules.ignore(tag, module as IgnoreTag, content);
 			}
 		}
 
