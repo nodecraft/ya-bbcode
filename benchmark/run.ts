@@ -10,12 +10,7 @@ import { Bench } from 'tinybench';
 import xbbcode from 'xbbcode-parser';
 
 import yabbcode from '../dist/ya-bbcode.mjs';
-import {
-	measureScaling,
-	scalingGrowth,
-	scalingScenarios,
-	scalingSizes,
-} from './scaling.ts';
+import { measureScaling, scalingGrowth, scalingScenarios } from './scaling.ts';
 import { benchCases } from './test-cases.ts';
 
 import type { ScalingPoint } from './scaling.ts';
@@ -50,8 +45,8 @@ interface ScalingReport {
 
 const current = 'ya-bbcode';
 const baselineName = 'ya-bbcode (baseline)';
-// Rows that are ya-bbcode variants rather than other libraries, so they are left out of the cross-library ranking
-const variants = new Set(['ya-bbcode (new instance)', baselineName]);
+// Every ya-bbcode row: their output is checked, and they are left out of the cross-library ranking
+const ours = new Set([current, 'ya-bbcode (new instance)', baselineName]);
 // Cost per unit may grow this much between the smallest and largest scaling size before the run fails; quadratic parsing lands near 100
 const maxScalingGrowth = 10;
 
@@ -151,7 +146,7 @@ function formatRatio(ratio: number): string {
 function findOutputProblems(benchCase: BenchCase, contenders: Contender[]): string[] {
 	const problems: string[] = [];
 	for (const contender of contenders) {
-		if (contender.name !== current && !variants.has(contender.name)) {
+		if (!ours.has(contender.name)) {
 			continue;
 		}
 		let output: unknown;
@@ -238,7 +233,7 @@ function opsFor(report: CaseReport, name: string): number {
 }
 
 function bestOtherLibrary(report: CaseReport): BenchResult | undefined {
-	return report.results.find(result => result.name !== current && !variants.has(result.name) && result.opsPerSec > 0);
+	return report.results.find(result => !ours.has(result.name) && result.opsPerSec > 0);
 }
 
 function geometricMean(ratios: number[]): number {
@@ -295,14 +290,9 @@ function runScaling(parsers: { name: string; Parser: Parser; }[]): { reports: Sc
 	const failures: string[] = [];
 	const nameWidth = Math.max(...scalingScenarios.map(scenario => scenario.name.length), ...parsers.map(parser => parser.name.length + 2));
 	for (const scenario of scalingScenarios) {
-		const sizes = scalingSizes(scenario);
 		for (const { name, Parser } of parsers) {
 			const parser = new Parser();
-			const points = measureScaling((input) => {
-				const output = parser.parse(input);
-				consume(output);
-				return output;
-			}, scenario);
+			const points = measureScaling(input => consume(parser.parse(input)), scenario);
 			const growth = scalingGrowth(points);
 			reports.push({ scenario: scenario.name, parser: name, points, growth });
 
@@ -321,7 +311,7 @@ function runScaling(parsers: { name: string; Parser: Parser; }[]): { reports: Sc
 			console.log(`${label.padEnd(nameWidth)} ${cells} growth ${verdict}${note}`);
 
 			if (name === current && !scenario.knownSuperlinear && (growth === undefined || growth > maxScalingGrowth)) {
-				failures.push(`Scaling "${scenario.name}": cost per unit grew ${verdict} from ${formatNumber(sizes[0] ?? 0)} to ${formatNumber(sizes.at(-1) ?? 0)} units (limit ${maxScalingGrowth}x)`);
+				failures.push(`Scaling "${scenario.name}": cost per unit grew ${verdict} from ${formatNumber(points[0]?.size ?? 0)} to ${formatNumber(points.at(-1)?.size ?? 0)} units (limit ${maxScalingGrowth}x)`);
 			}
 		}
 	}

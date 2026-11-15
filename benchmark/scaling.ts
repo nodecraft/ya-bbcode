@@ -47,14 +47,10 @@ const slowParseMs = 1500;
 const sampleBudgetMs = 150;
 const maxSamples = 20;
 
-export function scalingSizes(scenario: ScalingScenario): number[] {
-	return scenario.sizes ?? defaultSizes;
-}
-
-export function measureScaling(parse: (input: string) => string, scenario: ScalingScenario): ScalingPoint[] {
+export function measureScaling(parse: (input: string) => void, scenario: ScalingScenario): ScalingPoint[] {
 	const points: ScalingPoint[] = [];
 	let tooSlow = false;
-	for (const size of scalingSizes(scenario)) {
+	for (const size of scenario.sizes ?? defaultSizes) {
 		if (tooSlow) {
 			points.push({ size, note: 'skipped' });
 			continue;

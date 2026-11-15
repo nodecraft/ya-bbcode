@@ -523,9 +523,6 @@ function buildTree(doc: Doc, tags: TagsMap): OpenTag | undefined {
 		}
 	}
 
-	if (bounds.length === 0) {
-		return undefined;
-	}
 	parts.push(textBetween(doc, textStart, input.length));
 
 	// The first tag that never closes takes every unclaimed tag after it as a child
@@ -556,6 +553,16 @@ function resolve(doc: Doc, slot: number, value: string): void {
 	doc.parts[(slot * 2) + 1] = value;
 }
 
+// One piece of a replace tag's HTML, which its definition gives as a string or as a function of the tag's attributes
+function tagHtml(tag: OpenTag, html: ReplaceTag['close'] | undefined): string | null | undefined {
+	if (typeof(html) !== 'function') {
+		return html;
+	}
+	// Parsing fills in tag.attr, so it has to happen before the call reads it
+	const attrs = attributesOf(tag);
+	return html(tag.attr, attrs);
+}
+
 // Runs before a tag's children: the opening tag is replaced first so parents always resolve before what they contain
 function enter(doc: Doc, tag: OpenTag): void {
 	const definition = tag.kind.definition;
@@ -567,12 +574,7 @@ function enter(doc: Doc, tag: OpenTag): void {
 
 	const type: string = definition.type;
 	if (type === 'replace') {
-		let open = (definition as ReplaceTag).open;
-		if (typeof(open) === 'function') {
-			// Parsing fills in tag.attr, so it has to happen before the call reads it
-			const attrs = attributesOf(tag);
-			open = open(tag.attr, attrs);
-		}
+		const open = tagHtml(tag, (definition as ReplaceTag).open);
 		if (open) {
 			resolve(doc, tag.slot, open);
 		}
@@ -592,11 +594,7 @@ function enter(doc: Doc, tag: OpenTag): void {
 
 // Closes a tag that has no closing tag of its own, e.g. a [*] list item
 function autoClose(doc: Doc, tag: OpenTag, definition: ReplaceTag): void {
-	let html = definition.autoClose;
-	if (typeof(html) === 'function') {
-		const attrs = attributesOf(tag);
-		html = html(tag.attr, attrs);
-	}
+	const html = tagHtml(tag, definition.autoClose);
 
 	// Close before the next sibling of the same tag (e.g. the next [*]), not before inline tags like [b] inside this item
 	let before: number | undefined;
@@ -719,11 +717,7 @@ function leave(doc: Doc, tag: OpenTag): void {
 		if (definition.autoClose && tag.closeSlot === -1) {
 			autoClose(doc, tag, definition);
 		}
-		let close = definition.close;
-		if (typeof(close) === 'function') {
-			const attrs = attributesOf(tag);
-			close = close(tag.attr, attrs);
-		}
+		const close = tagHtml(tag, definition.close);
 		if (close && tag.closeSlot !== -1) {
 			resolve(doc, tag.closeSlot, close);
 		}
@@ -968,14 +962,7 @@ class yabbcode {
 		};
 		const { parts } = doc;
 
-		let root: OpenTag | undefined;
-		if (input.includes('[')) {
-			root = buildTree(doc, this.tags);
-		}
-		if (parts.length === 0) {
-			// handle when no tags are present
-			parts.push(textBetween(doc, 0, input.length));
-		}
+		const root = buildTree(doc, this.tags);
 		if (this.config.paragraph) {
 			parts[0] = '<p>' + parts[0];
 			parts[parts.length - 1] += '</p>';
