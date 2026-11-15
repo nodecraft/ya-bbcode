@@ -252,7 +252,7 @@ describe('ya-bbcode', () => {
 	});
 	it('Clean unmatchable: retained', () => {
 		const parser = new yabbc({ cleanUnmatchable: false });
-		expect(parser.parse(bbcodes.unmatchable)).toBe('<strong>Game Servers Done Right![TAG-1]</strong>');
+		expect(parser.parse(bbcodes.unmatchable)).toBe('<strong>Game Servers Done Right![img]</strong>');
 	});
 	it('Clear tags', () => {
 		const parser = new yabbc();
@@ -589,3 +589,88 @@ describe('Security Tests', () => {
 	});
 });
 
+
+describe('Placeholder handling', () => {
+	it('does not leak placeholders for unmatched tags (#402)', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[/b]stray')).toBe('stray');
+		expect(parser.parse('[img]https://example.com/a.png')).toBe('https://example.com/a.png');
+		expect(parser.parse('[i]a[/i][i]b[/i][i]c[/i][i]d[/i][i]e[/i][/b]')).toBe('<i>a</i><i>b</i><i>c</i><i>d</i><i>e</i>');
+	});
+
+	it('restores unmatched tags as written when cleanUnmatchable is off', () => {
+		const parser = new yabbc({ cleanUnmatchable: false });
+		expect(parser.parse('[/b]stray')).toBe('[/b]stray');
+		// >50 top-level tags takes the optimized path, which must follow the same rule
+		expect(parser.parse('[b]x[/b]'.repeat(60) + '[/i]')).toBe('<strong>x</strong>'.repeat(60) + '[/i]');
+	});
+
+	it('does not double-escape & in url, img and quote attributes (#402)', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[url=https://example.com/?a=1&b=2]link[/url]')).toBe('<a href="https://example.com/?a=1&amp;b=2">link</a>');
+		expect(parser.parse('[img]https://example.com/a.png?a=1&b=2[/img]')).toBe('<img src="https://example.com/a.png?a=1&amp;b=2" alt=""/>');
+		expect(parser.parse('[quote=Tom & Jerry]hi[/quote]')).toBe('<blockquote author="Tom &amp; Jerry">hi</blockquote>');
+	});
+
+	it('still escapes attribute breakouts with sanitizeHtml on and off', () => {
+		for (const sanitizeHtml of [true, false]) {
+			const parser = new yabbc({ sanitizeHtml });
+			expect(parser.parse('[quote=a" onmouseover="x]hi[/quote]')).toBe('<blockquote author="a&quot; onmouseover=&quot;x">hi</blockquote>');
+			expect(parser.parse('[img]a" onerror="x[/img]')).toBe('<img src="a&quot; onerror=&quot;x" alt=""/>');
+		}
+	});
+
+	it('does not expand $ replacement patterns from attributes', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[url=x onmouseover=alert(1)]z[/url][quote=$`]a[/quote]')).toBe('<a href="x onmouseover=alert(1)">z</a><blockquote author="$`">a</blockquote>');
+		expect(parser.parse('[quote=$&]a[/quote]')).toBe('<blockquote author="$&amp;">a</blockquote>');
+
+		const rawParser = new yabbc({ sanitizeHtml: false });
+		expect(rawParser.parse('[quote=$\']a[/quote][b]b[/b]')).toBe('<blockquote author="$&#39;">a</blockquote><strong>b</strong>');
+	});
+
+	it('does not let user text forge placeholders', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[TAG-2][b]x[/b]')).toBe('[TAG-2]<strong>x</strong>');
+		const nul = '\0';
+		expect(parser.parse(`${nul}2${nul}[b]x[/b]`)).toBe('2<strong>x</strong>');
+		// Digits between two placeholders must not read as another placeholder
+		expect(parser.parse('[url][/constructor]2[url=]')).toBe('<a href="#">2<a href="#">');
+	});
+});
+
+describe('Fuzz findings', () => {
+	it('treats prototype-named tags as unknown instead of throwing', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[constructor]hi')).toBe('[constructor]hi');
+		expect(parser.parse('[__proto__]x[/__proto__]')).toBe('[__proto__]x[/__proto__]');
+	});
+
+	it('blocks schemes hidden by characters browsers strip from URLs', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[url=java\tscript:alert(1)]x[/url]')).toBe('<a href="#">x</a>');
+		expect(parser.parse('[url=java\nscript:alert(1)]x[/url]')).toBe('<a href="#">x</a>');
+		expect(parser.parse('[url=\u{1} javascript:alert(1)]x[/url]')).toBe('<a href="#">x</a>');
+	});
+
+	it('handles tags that span a newline', () => {
+		const parser = new yabbc({ cleanUnmatchable: false });
+		expect(parser.parse('[/url][noparse k= \r\n]')).toBe('[/url]');
+		expect(new yabbc().parse('[url=https://example.com\n]x[/url]')).toBe('<a href="https://example.com">x</a>');
+	});
+
+	it('escapes restored tags in raw mode, since they can land inside attributes', () => {
+		const parser = new yabbc({ sanitizeHtml: false, cleanUnmatchable: false });
+		expect(parser.parse('[url][img][url="][/IMG][url]')).toBe('<a href="#"><img src="[url=&quot;]" alt=""/><a href="#">');
+		// Unknown tags and unmatched closing tags are restored at different stages, and both must stay inside the attribute
+		expect(parser.parse('[img][x="]y[/x][/img]')).toBe('<img src="[x=&quot;]y[/x]" alt=""/>');
+		expect(parser.parse('[img]a[/b"][/img]')).toBe('<img src="a[/b&quot;]" alt=""/>');
+	});
+
+	it('converts newlines inside restored tags like the surrounding text', () => {
+		expect(new yabbc({ cleanUnmatchable: false }).parse('a\n[/x\n]b')).toBe('a<br/>[/x<br/>]b');
+		expect(new yabbc({ cleanUnmatchable: false, paragraph: true }).parse('a[/x\n]b')).toBe('<p>a[/x</p><p>]b</p>');
+		expect(new yabbc().parse('[noparse][b\n][/noparse]')).toBe('[b<br/>]');
+		expect(new yabbc({ newline: false }).parse('[x\n]y')).toBe('[x\n]y');
+	});
+});
