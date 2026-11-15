@@ -37,7 +37,8 @@ jobs:
       - run: npm run build
       - run: npm test
       # Fresh random seed each run; a failure logs FUZZ_SEED to replay it locally.
-      - if: matrix.node == 26
+      # Skipped on main pushes so a new random finding can't block an unrelated commit's release.
+      - if: matrix.node == 26 && github.event_name != 'push'
         run: npm run test:fuzz
 
   # Fails when actions.lock drifts from the workflows or a locked pin no longer verifies upstream.
