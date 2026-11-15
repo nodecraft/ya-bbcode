@@ -584,11 +584,21 @@ describe('Security Tests', () => {
 		parser.parse('[test prototype=polluted]content[/test]');
 	});
 
-	it('Prototype Pollution Prevention: registerTag blocks dangerous names', () => {
+	it('Prototype Pollution Prevention: registerTag blocks __proto__', () => {
 		const parser = new yabbc();
 		expect(() => parser.registerTag('__proto__', { type: 'ignore' })).toThrow('Cannot register tag with dangerous name');
-		expect(() => parser.registerTag('constructor', { type: 'ignore' })).toThrow('Cannot register tag with dangerous name');
-		expect(() => parser.registerTag('prototype', { type: 'ignore' })).toThrow('Cannot register tag with dangerous name');
+		expect(() => parser.registerTag('__PROTO__', { type: 'ignore' })).toThrow('Cannot register tag with dangerous name');
+		expect(Object.getPrototypeOf(parser.tags)).toBe(Object.prototype);
+	});
+
+	it('registers constructor and prototype as ordinary tags, as Godot docs use [constructor]', () => {
+		const parser = new yabbc();
+		parser.registerTag('constructor', { type: 'replace', open: '<c>', close: '</c>' });
+		parser.registerTag('prototype', { type: 'replace', open: '<p>', close: '</p>' });
+		expect(parser.parse('[constructor]x[/constructor][prototype]y[/prototype]')).toBe('<c>x</c><p>y</p>');
+		expect(Object.getPrototypeOf(parser.tags)).toBe(Object.prototype);
+		// Unregistered, they are still unknown tags rather than inherited members
+		expect(new yabbc().parse('[constructor]x[/constructor]')).toBe('[constructor]x[/constructor]');
 	});
 
 	it('Security: case-insensitive dangerous key blocking', () => {
@@ -1062,6 +1072,30 @@ describe('Forum quote formats', () => {
 		['XenForo', '[QUOTE="bjf, post: 9611, member: 135"]', 'bjf'],
 	])('keeps the rest of the line for %s when a quoted value follows', (_engine, tag, author) => {
 		expect(new yabbc().parse(`${tag}hi[/quote] see [url="https://example.com"]this[/url]`)).toBe(`<blockquote author="${author}">hi</blockquote> see <a href="https://example.com">this</a>`);
+	});
+});
+
+describe('Case-sensitive tag names', () => {
+	it('match only as registered, so a capitalized name like [Signal] stays text', () => {
+		const parser = new yabbc({ caseSensitive: true });
+		parser.registerTag('signal', { type: 'replace', open: (_attr, attrs) => `<s>${Object.keys(attrs)[0]}</s>`, close: null });
+		expect(parser.parse('[signal ready] [Signal]')).toBe('<s>ready</s> [Signal]');
+	});
+
+	it('keep a raw tag from swallowing the rest of the text after a name like [GDScript]', () => {
+		const parser = new yabbc({ caseSensitive: true });
+		parser.registerTag('gdscript', { type: 'content', raw: true, replace: (_attr, code) => `<pre>${code}</pre>` });
+		expect(parser.parse('a [GDScript] b [b]c[/b] [gdscript][b][/gdscript]')).toBe('a [GDScript] b <strong>c</strong> <pre>[b]</pre>');
+	});
+
+	it('only match the built-in tags in lowercase', () => {
+		expect(new yabbc({ caseSensitive: true }).parse('[B]x[/B] [b]y[/b]')).toBe('[B]x[/B] <strong>y</strong>');
+	});
+
+	it('are off by default', () => {
+		const parser = new yabbc();
+		parser.registerTag('Shout', { type: 'replace', open: '<em>', close: '</em>' });
+		expect(parser.parse('[B]x[/B] [shout]y[/SHOUT]')).toBe('<strong>x</strong> <em>y</em>');
 	});
 });
 

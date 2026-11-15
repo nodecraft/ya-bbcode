@@ -5,6 +5,11 @@ interface Config {
 	cleanUnmatchable?: boolean;
 	sanitizeHtml?: boolean;
 	allowedSchemes?: string[];
+	/**
+	 * Match tag names exactly instead of ignoring case, for dialects like Godot's where [signal x] is a tag but
+	 * [Signal] names a class. Tags are then registered and matched as written, and the built-in tags are lowercase.
+	 */
+	caseSensitive?: boolean;
 }
 
 // Parsed attributes from tags like [code lang=javascript skip-lint]
@@ -291,8 +296,12 @@ function nameEnd(content: string): number {
 	return content.search(whitespace);
 }
 
-function tagName(content: string): string {
-	return content.slice(0, nameEnd(content)).toLowerCase();
+function tagName(content: string, caseSensitive: boolean): string {
+	const name = content.slice(0, nameEnd(content));
+	if (caseSensitive) {
+		return name;
+	}
+	return name.toLowerCase();
 }
 
 function whitespaceAt(content: string, from: number): number {
@@ -687,8 +696,8 @@ function adopt(parent: OpenTag, orphans: OpenTag[]): void {
 /**
  * Looks up the kind for the text between a tag's brackets, creating it the first time a name is seen.
  */
-function kindOf(kinds: Map<string, TagKind>, tags: TagsMap, content: string): TagKind {
-	const name = tagName(content);
+function kindOf(kinds: Map<string, TagKind>, tags: TagsMap, content: string, caseSensitive: boolean): TagKind {
+	const name = tagName(content, caseSensitive);
 	let kind = kinds.get(name);
 	if (kind === undefined) {
 		// Tag names come from user input, so inherited keys like `constructor` must not resolve to Object.prototype members.
@@ -732,7 +741,7 @@ const recentMaxLength = 16;
  * Finds every tag in one pass, pairs opening and closing tags and links them into a tree.
  * Returns the first top-level tag, or undefined when the input has no opening tag.
  */
-function buildTree(doc: Doc, tags: TagsMap): OpenTag | undefined {
+function buildTree(doc: Doc, tags: TagsMap, caseSensitive: boolean): OpenTag | undefined {
 	const { input, parts, bounds } = doc;
 	const kinds = new Map<string, TagKind>();
 	// Documents repeat a few short tags, so the last spelling seen per hash is checked before allocating and hashing a new string
@@ -806,7 +815,7 @@ function buildTree(doc: Doc, tags: TagsMap): OpenTag | undefined {
 		let spelling = recent[hash];
 		if (spelling === undefined || !spells(spelling.content, input, nameStart, length)) {
 			const content = input.slice(nameStart, close);
-			spelling = { content, kind: kindOf(kinds, tags, content) };
+			spelling = { content, kind: kindOf(kinds, tags, content, caseSensitive) };
 			if (length <= recentMaxLength) {
 				recent[hash] = spelling;
 			}
@@ -1283,6 +1292,9 @@ class yabbcode {
 		if (config.allowedSchemes !== undefined) {
 			this.config.allowedSchemes = config.allowedSchemes;
 		}
+		if (config.caseSensitive !== undefined) {
+			this.config.caseSensitive = config.caseSensitive;
+		}
 	}
 
 	// Forum exports put post details beside the name, which readers don't need: SMF also names it as an author= attribute
@@ -1367,10 +1379,13 @@ class yabbcode {
 	}
 
 	registerTag(tag: string, options: TagDefinition): this {
-		const tagName = String(tag).toLowerCase();
+		let tagName = String(tag);
+		if (!this.config.caseSensitive) {
+			tagName = tagName.toLowerCase();
+		}
 
-		// Prevent prototype pollution
-		if (dangerousKeys.has(tagName)) {
+		// Assigning `__proto__` would replace the prototype. `constructor` and `prototype` become own properties, and Godot's docs use [constructor].
+		if (tagName === '__proto__') {
 			throw new Error(`Cannot register tag with dangerous name: ${tagName}`);
 		}
 
@@ -1415,7 +1430,7 @@ class yabbcode {
 		};
 		const { parts } = doc;
 
-		const root = buildTree(doc, this.tags);
+		const root = buildTree(doc, this.tags, this.config.caseSensitive === true);
 		if (this.config.paragraph) {
 			parts[0] = '<p>' + parts[0];
 			parts[parts.length - 1] += '</p>';
@@ -1438,6 +1453,27 @@ class yabbcode {
 		}
 		return output.replaceAll(placeholders, (_match: string, index: string) => this.#leftover(doc, Number(index)));
 	}
+}
+
+// Aliases for the namespace below, which can't refer to the outer types by their own names
+type ConfigType = Config;
+type TagAttributesType = TagAttributes;
+type ReplaceHtmlType = ReplaceHtml;
+type ReplaceTagType = ReplaceTag;
+type ContentTagType = ContentTag;
+type IgnoreTagType = IgnoreTag;
+type TagDefinitionType = TagDefinition;
+
+// CommonJS exports only the class, so its types are also reachable through it, as in yabbcode.Config
+// eslint-disable-next-line @typescript-eslint/no-namespace
+declare namespace yabbcode {
+	export type Config = ConfigType;
+	export type TagAttributes = TagAttributesType;
+	export type ReplaceHtml = ReplaceHtmlType;
+	export type ReplaceTag = ReplaceTagType;
+	export type ContentTag = ContentTagType;
+	export type IgnoreTag = IgnoreTagType;
+	export type TagDefinition = TagDefinitionType;
 }
 
 // Export types for users

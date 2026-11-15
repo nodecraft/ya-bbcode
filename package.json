@@ -21,13 +21,19 @@
 	"type": "module",
 	"main": "./dist/ya-bbcode.cjs",
 	"module": "./dist/ya-bbcode.mjs",
-	"types": "./dist/ya-bbcode.d.mts",
+	"types": "./dist/ya-bbcode.d.cts",
 	"exports": {
 		".": {
-			"types": "./dist/ya-bbcode.d.mts",
-			"import": "./dist/ya-bbcode.mjs",
-			"require": "./dist/ya-bbcode.cjs"
-		}
+			"import": {
+				"types": "./dist/ya-bbcode.d.mts",
+				"default": "./dist/ya-bbcode.mjs"
+			},
+			"require": {
+				"types": "./dist/ya-bbcode.d.cts",
+				"default": "./dist/ya-bbcode.cjs"
+			}
+		},
+		"./package.json": "./package.json"
 	},
 	"files": [
 		"dist"
@@ -42,7 +48,7 @@
 		"prepublishOnly": "npm run build",
 		"test": "npm run check-types && vitest run && npm run test:imports",
 		"test:fuzz": "vitest run --config vitest.fuzz.config.ts",
-		"test:imports": "node test-imports/test-esm.mjs && node test-imports/test-cjs.cjs",
+		"test:imports": "node test-imports/test-esm.mjs && node test-imports/test-cjs.cjs && tsc -p test-imports",
 		"test:unit": "vitest run"
 	},
 	"devDependencies": {

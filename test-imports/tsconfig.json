@@ -1,0 +1,13 @@
+{
+	// Type-checks the published types as consumers see them, resolving 'ya-bbcode' through package.json exports
+	"compilerOptions": {
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"target": "ES2022",
+		"strict": true,
+		"noEmit": true,
+		"skipLibCheck": false,
+		"types": []
+	},
+	"include": ["types/*.cts", "types/*.mts"]
+}
