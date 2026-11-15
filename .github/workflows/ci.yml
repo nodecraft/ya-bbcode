@@ -36,6 +36,9 @@ jobs:
         run: npm run lint:ci
       - run: npm run build
       - run: npm test
+      # Fresh random seed each run; a failure logs FUZZ_SEED to replay it locally.
+      - if: matrix.node == 26
+        run: npm run test:fuzz
 
   # Fails when actions.lock drifts from the workflows or a locked pin no longer verifies upstream.
   lockfile:

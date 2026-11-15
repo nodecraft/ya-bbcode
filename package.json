@@ -41,6 +41,7 @@
 		"lint:ci": "eslint .",
 		"prepublishOnly": "npm run build",
 		"test": "npm run check-types && vitest run && npm run test:imports",
+		"test:fuzz": "vitest run --config vitest.fuzz.config.ts",
 		"test:imports": "node test-imports/test-esm.mjs && node test-imports/test-cjs.cjs",
 		"test:unit": "vitest run"
 	},
@@ -52,6 +53,8 @@
 		"@types/node": "26.6.6",
 		"@vitest/coverage-v8": "5.1.0",
 		"eslint": "10.14.0",
+		"fast-check": "4.10.2",
+		"parse5": "8.1.1",
 		"semantic-release": "25.0.9",
 		"tinybench": "6.2.3",
 		"tsdown": "0.23.7",
