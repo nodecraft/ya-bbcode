@@ -166,6 +166,20 @@ describe('ya-bbcode', () => {
 		const parser = new yabbc();
 		expect(parser.parse(bbcodes.noparse_unclosed)).toBe('[img]https://nodecraft.com/assets/images/logo.png[/img]');
 	});
+	it('Tag: noparse keeps unmatched closing tags as text', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[noparse][/b][/noparse]')).toBe('[/b]');
+		expect(parser.parse('[noparse]a[/b]b[/noparse]')).toBe('a[/b]b');
+		expect(parser.parse('[noparse][/b]')).toBe('[/b]');
+		expect(parser.parse('[noparse][noparse][/noparse]')).toBe('[noparse]');
+	});
+	it('Tag: noparse contents never pair with tags outside it', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[b][noparse][/b][/noparse]')).toBe('<strong>[/b]');
+		expect(parser.parse('[noparse][b][/noparse][b]x[/b]')).toBe('[b]<strong>x</strong>');
+		// A tag inside noparse can contain the closing tag's text, which must not be mistaken for the real close
+		expect(parser.parse('[noparse][a[/noparse] [/noparse]')).toBe('[a[/noparse] ');
+	});
 	it('Custom Tag, all functions', () => {
 		const parser = new yabbc();
 		parser.registerTag('url', {
@@ -447,6 +461,25 @@ describe('Security Tests', () => {
 		expect(parser.parse('[url=JaVaScRiPt:alert(1)]Click[/url]')).toBe('<a href="#">Click</a>');
 	});
 
+	it('XSS Prevention: img sources follow allowedSchemes', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[img]javascript:alert(1)[/img]')).toBe('');
+		expect(parser.parse('[img]java\tscript:alert(1)[/img]')).toBe('');
+		expect(parser.parse('[img]data:image/png;base64,AAAA[/img]')).toBe('');
+		expect(parser.parse('[img] https://example.com/a.png [/img]')).toBe('<img src="https://example.com/a.png" alt=""/>');
+		expect(parser.parse('[img]/a.png[/img]')).toBe('<img src="/a.png" alt=""/>');
+
+		const dataParser = new yabbc({ allowedSchemes: ['https', 'data'] });
+		expect(dataParser.parse('[img]data:image/png;base64,AAAA[/img]')).toBe('<img src="data:image/png;base64,AAAA" alt=""/>');
+	});
+
+	it('XSS Prevention: an unmatched tag cannot hide an img scheme', () => {
+		for (const cleanUnmatchable of [true, false]) {
+			const parser = new yabbc({ cleanUnmatchable });
+			expect(parser.parse('[img][/b]javascript:alert(1)[/img]')).toBe('');
+		}
+	});
+
 	it('XSS Prevention: data: URLs blocked', () => {
 		const parser = new yabbc();
 		expect(parser.parse('[url=data:text/html,<script>alert(1)</script>]Click[/url]')).toBe('<a href="#">Click</a>');
@@ -661,10 +694,13 @@ describe('Fuzz findings', () => {
 
 	it('escapes restored tags in raw mode, since they can land inside attributes', () => {
 		const parser = new yabbc({ sanitizeHtml: false, cleanUnmatchable: false });
-		expect(parser.parse('[url][img][url="][/IMG][url]')).toBe('<a href="#"><img src="[url=&quot;]" alt=""/><a href="#">');
+		parser.registerTag('tip', {
+			type: 'content',
+			replace: (_attr, content) => `<span title="${content.replaceAll('"', '&quot;')}"></span>`,
+		});
 		// Unknown tags and unmatched closing tags are restored at different stages, and both must stay inside the attribute
-		expect(parser.parse('[img][x="]y[/x][/img]')).toBe('<img src="[x=&quot;]y[/x]" alt=""/>');
-		expect(parser.parse('[img]a[/b"][/img]')).toBe('<img src="a[/b&quot;]" alt=""/>');
+		expect(parser.parse('[tip][x="]y[/x][/tip]')).toBe('<span title="[x=&quot;]y[/x]"></span>');
+		expect(parser.parse('[tip]a[/b"][/tip]')).toBe('<span title="a[/b&quot;]"></span>');
 	});
 
 	it('converts newlines inside restored tags like the surrounding text', () => {

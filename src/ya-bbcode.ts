@@ -110,14 +110,17 @@ function normalizeUrl(url: string): string {
 	return url.slice(start, end).replaceAll(/[\t\n\r]/g, '');
 }
 
+const defaultAllowedSchemes = ['http', 'https', 'mailto', 'ftp', 'ftps'];
+
 /**
  * Validates and sanitizes URLs to prevent javascript: and data: URL attacks
  * Only allows safe URL schemes based on the allowedSchemes list
+ * Returns undefined for empty or disallowed URLs
  */
-function sanitizeUrl(url: string, allowedSchemes: string[]): string {
+function sanitizeUrl(url: string, allowedSchemes: string[]): string | undefined {
 	const trimmed = normalizeUrl(String(url));
 	if (!trimmed) {
-		return '#';
+		return undefined;
 	}
 
 	// Allow relative URLs (starting with /, ./, or ../)
@@ -136,7 +139,7 @@ function sanitizeUrl(url: string, allowedSchemes: string[]): string {
 		const scheme = schemeMatch[1] ?? '';
 		if (!allowedSchemes.includes(scheme)) {
 			// Dangerous scheme detected (javascript:, data:, vbscript:, etc.)
-			return '#';
+			return undefined;
 		}
 	}
 
@@ -209,7 +212,7 @@ class yabbcode {
 	tags: TagsMap = {
 		'url': {
 			type: 'replace',
-			open: attr => `<a href="${escapeHtmlAttr(sanitizeUrl(this.#unsanitize(attr), this.config.allowedSchemes ?? ['http', 'https', 'mailto', 'ftp', 'ftps']))}">`,
+			open: attr => `<a href="${escapeHtmlAttr(sanitizeUrl(this.#unsanitize(attr), this.config.allowedSchemes ?? defaultAllowedSchemes) ?? '#')}">`,
 			close: '</a>',
 		},
 		'quote': {
@@ -301,10 +304,13 @@ class yabbcode {
 		'img': {
 			type: 'content',
 			replace: (attr, content) => {
-				if (!content) {
+				// Leftover placeholders are resolved after this check, so a removed one could hide a scheme like `[/b]javascript:`
+				const url = this.#unsanitize(content.replaceAll(this.regex.placeholders, ''));
+				const src = sanitizeUrl(url, this.config.allowedSchemes ?? defaultAllowedSchemes);
+				if (src === undefined) {
 					return '';
 				}
-				return `<img src="${escapeHtmlAttr(this.#unsanitize(content))}" alt="${escapeHtmlAttr(this.#unsanitize(attr))}"/>`;
+				return `<img src="${escapeHtmlAttr(src)}" alt="${escapeHtmlAttr(this.#unsanitize(attr))}"/>`;
 			},
 		},
 		'noparse': {
@@ -368,8 +374,7 @@ class yabbcode {
 				closeTag = placeholder(tag.closing.index);
 				end = content.indexOf(closeTag);
 			}
-			let innerContent = content.slice(start + openTag.length, end);
-			innerContent = this.#ignoreLoop(tag.children, innerContent);
+			const innerContent = content.slice(start + openTag.length, end);
 			const contentStart = content.slice(0, Math.max(0, start));
 			const contentEnd = content.slice(end + closeTag.length);
 			return contentStart + innerContent + contentEnd;
@@ -382,7 +387,7 @@ class yabbcode {
 			paragraph: false,
 			cleanUnmatchable: true,
 			sanitizeHtml: true,
-			allowedSchemes: ['http', 'https', 'mailto', 'ftp', 'ftps'],
+			allowedSchemes: [...defaultAllowedSchemes],
 		};
 		if (config.newline !== undefined) {
 			this.config.newline = config.newline;
@@ -435,17 +440,22 @@ class yabbcode {
 		return unescapeSanitized(value);
 	}
 
-	#ignoreLoop(tagsMap: TagItem[], content: string): string {
+	// Tags inside an ignore tag are plain text, so they must never get a placeholder that could pair with a tag outside it.
+	#findIgnoredTags(tagsMap: TagItem[]): Set<number> {
+		const ignored = new Set<number>();
+		let ignoreModule: string | undefined;
 		for (const tag of tagsMap) {
-			content = replaceFirst(content, placeholder(tag.index), tag.raw);
-			if (tag.closing) {
-				content = replaceFirst(content, placeholder(tag.closing.index), tag.closing.raw);
-			}
-			if (tag.children.length > 0) {
-				content = this.#ignoreLoop(tag.children, content);
+			if (ignoreModule === undefined) {
+				if (!tag.isClosing && this.#getTag(tag.module)?.type === 'ignore') {
+					ignoreModule = tag.module;
+				}
+			} else if (tag.isClosing && tag.module === ignoreModule) {
+				ignoreModule = undefined;
+			} else {
+				ignored.add(tag.index);
 			}
 		}
-		return content;
+		return ignored;
 	}
 
 	#contentLoop(tagsMap: TagItem[], content: string, parentClosingTagIndex?: number): string {
@@ -788,38 +798,27 @@ class yabbcode {
 			tagsMap.push(item);
 		}
 
-		// Replace tags with placeholders - optimized for different input sizes
-		if (tags.length <= 3) {
-			// Fast path for few tags - direct replacement is faster
-			for (const [i, tag] of tags.entries()) {
-				input = replaceFirst(input, tag, placeholder(i));
-			}
-		} else {
-			// Batch replacement for many tags
-			const tagPositions = [];
-			let lastIndex = 0;
-			for (const [i, tag] of tags.entries()) {
-				const pos = input.indexOf(tag, lastIndex);
-				if (pos === -1) {
-					continue;
-				}
+		const ignored = this.#findIgnoredTags(tagsMap);
+		tagsMap = tagsMap.filter(tag => !ignored.has(tag.index));
 
-				tagPositions.push({ pos, tag: tag, placeholder: placeholder(i) });
-				lastIndex = pos + tag.length;
+		// Ignored tags are still located so the search moves past them, since their text can contain a later tag's text
+		const parts: string[] = [];
+		let searchFrom = 0;
+		let copiedUpTo = 0;
+		for (const [i, tag] of tags.entries()) {
+			const pos = input.indexOf(tag, searchFrom);
+			if (pos === -1) {
+				continue;
 			}
-
-			if (tagPositions.length > 0) {
-				const parts = [];
-				let lastPos = 0;
-				for (const { pos, tag, placeholder } of tagPositions) {
-					parts.push(input.slice(lastPos, pos));
-					parts.push(placeholder);
-					lastPos = pos + tag.length;
-				}
-				parts.push(input.slice(lastPos));
-				input = parts.join('');
+			searchFrom = pos + tag.length;
+			if (ignored.has(i)) {
+				continue;
 			}
+			parts.push(input.slice(copiedUpTo, pos), placeholder(i));
+			copiedUpTo = searchFrom;
 		}
+		parts.push(input.slice(copiedUpTo));
+		input = parts.join('');
 		// Only after placeholders are in, so a tag spanning lines still matches its raw text
 		input = this.#applyLayout(input);
 		// loop through each tag to create nested elements
