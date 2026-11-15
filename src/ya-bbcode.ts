@@ -73,7 +73,9 @@ function escapeHtmlAttr(value: string): string {
  */
 function sanitizeUrl(url: string, allowedSchemes: string[]): string {
 	const trimmed = String(url).trim();
-	if (!trimmed) { return '#'; }
+	if (!trimmed) {
+		return '#';
+	}
 
 	// Allow relative URLs (starting with /, ./, or ../)
 	if (/^\.{0,2}\//.test(trimmed)) {
@@ -129,7 +131,9 @@ function parseTagAttributes(tagContent: string): { attr: string; attrs: TagAttri
 
 	for (let i = 1; i < parts.length; i++) {
 		const part = parts[i];
-		if (!part) { continue; }
+		if (!part) {
+			continue;
+		}
 
 		if (part.includes('=')) {
 			const eqIndex = part.indexOf('=');
@@ -266,9 +270,9 @@ class yabbcode {
 	};
 
 	regex = {
-		tags: /(\[[^\]^]+])/g,
+		tags: /(\[[^\]^]+\])/g,
 		newline: /\r\n|\r|\n/g,
-		placeholders: /\[TAG-[1-9]+]/g,
+		placeholders: /\[TAG-[1-9]+\]/g,
 	};
 
 	config: Config;
@@ -294,7 +298,9 @@ class yabbcode {
 			return content;
 		},
 		content: (tag: TagItem, module: ContentTag, content: string): string => {
-			if (!tag.closing) { return content; }
+			if (!tag.closing) {
+				return content;
+			}
 			const openTag = '[TAG-' + tag.index + ']';
 			const closeTag = '[TAG-' + tag.closing.index + ']';
 			const start = content.indexOf(openTag);
@@ -377,8 +383,12 @@ class yabbcode {
 			const hasSpecialType = (tag: TagItem): boolean => {
 				const module = this.tags[tag.module];
 				if (module) {
-					if (module.type === 'content' || module.type === 'ignore') { return true; }
-					if (module.type === 'replace' && (module as ReplaceTag).autoClose) { return true; }
+					if (module.type === 'content' || module.type === 'ignore') {
+						return true;
+					}
+					if (module.type === 'replace' && (module as ReplaceTag).autoClose) {
+						return true;
+					}
 				}
 				return tag.children.some(child => hasSpecialType(child));
 			};
@@ -392,7 +402,9 @@ class yabbcode {
 
 		for (let i = 0; i < tagsMap.length; i++) {
 			const tag = tagsMap[i];
-			if (!tag) { continue; }
+			if (!tag) {
+				continue;
+			}
 
 			let module = this.tags[tag.module];
 			if (!module) {
@@ -488,7 +500,9 @@ class yabbcode {
 			}
 
 			// Only handle replace type (this function is only called when all tags are replace type)
-			if (module.type !== 'replace') { return; }
+			if (module.type !== 'replace') {
+				return;
+			}
 
 			let open = module.open;
 			let close = module.close;
@@ -506,10 +520,8 @@ class yabbcode {
 			}
 
 			// Process children recursively
-			if (tag.children.length > 0) {
-				for (const child of tag.children) {
-					processTag(child);
-				}
+			for (const child of tag.children) {
+				processTag(child);
 			}
 		};
 
@@ -519,7 +531,7 @@ class yabbcode {
 		}
 
 		// Single-pass replacement using regex
-		const placeholderRegex = /\[TAG-(\d+)]/g;
+		const placeholderRegex = /\[TAG-(\d+)\]/g;
 		return content.replaceAll(placeholderRegex, (match: string) => replacements.get(match) || '');
 	}
 
@@ -530,13 +542,17 @@ class yabbcode {
 
 		for (let i = 0; i < tagsMap.length; i++) {
 			const tag = tagsMap[i];
-			if (!tag) { continue; }
+			if (!tag) {
+				continue;
+			}
 
 			if (tag.isClosing) {
 				// Find matching opening tag on stack (search backwards for proper nesting)
 				for (let stackIndex = stack.length - 1; stackIndex >= 0; stackIndex--) {
 					const openTag = stack[stackIndex];
-					if (!openTag) { continue; }
+					if (!openTag) {
+						continue;
+					}
 					if (openTag.module === tag.module && !processed.has(openTag.index)) {
 						// Match found
 						openTag.matchTag = tag.index;
@@ -550,10 +566,12 @@ class yabbcode {
 							openTag.children = [];
 							for (let childIndex = childStart; childIndex < i; childIndex++) {
 								const childTag = tagsMap[childIndex];
-								if (childTag && !childTag.isClosing && childTag.parent === null) {
-									childTag.parent = openTag.index;
-									openTag.children.push(childTag);
+								if (!(childTag && !childTag.isClosing && childTag.parent === null)) {
+									continue;
 								}
+
+								childTag.parent = openTag.index;
+								openTag.children.push(childTag);
 							}
 						}
 
@@ -573,31 +591,39 @@ class yabbcode {
 		for (const tag of stack) {
 			tag.matchTag = false;
 			const childStart = (tag.stackIndex ?? 0) + 1;
-			if (childStart < tagsMap.length) {
-				tag.children = [];
-				for (let childIndex = childStart; childIndex < tagsMap.length; childIndex++) {
-					const childTag = tagsMap[childIndex];
-					if (childTag && !childTag.isClosing && childTag.parent === null) {
-						childTag.parent = tag.index;
-						tag.children.push(childTag);
-					}
+			if (!(childStart < tagsMap.length)) {
+				continue;
+			}
+
+			tag.children = [];
+			for (let childIndex = childStart; childIndex < tagsMap.length; childIndex++) {
+				const childTag = tagsMap[childIndex];
+				if (!(childTag && !childTag.isClosing && childTag.parent === null)) {
+					continue;
 				}
+
+				childTag.parent = tag.index;
+				tag.children.push(childTag);
 			}
 		}
 
 		// Filter and process recursively
 		const result = [];
 		for (const tag of tagsMap) {
-			if (!tag.isClosing) {
-				const shouldInclude = (parent === undefined && tag.parent === null) ||
-					(parent !== undefined && tag.parent === parent);
-				if (shouldInclude) {
-					if (tag.children.length > 0) {
-						tag.children = this.#tagLoop(tag.children, tag.index);
-					}
-					result.push(tag);
-				}
+			if (tag.isClosing) {
+				continue;
 			}
+
+			const shouldInclude = (parent === undefined && tag.parent === null) ||
+				(parent !== undefined && tag.parent === parent);
+			if (!shouldInclude) {
+				continue;
+			}
+
+			if (tag.children.length > 0) {
+				tag.children = this.#tagLoop(tag.children, tag.index);
+			}
+			result.push(tag);
 		}
 
 		return result;
@@ -625,7 +651,9 @@ class yabbcode {
 		if (
 			typeof(bbcInput) === 'boolean'
 			|| (typeof(bbcInput) !== 'string' && Number.isNaN(Number(bbcInput)))
-		) { return ''; }
+		) {
+			return '';
+		}
 		let input = String(bbcInput);
 		if (this.config.sanitizeHtml) {
 			// Batch HTML entity replacement for better performance
@@ -672,11 +700,11 @@ class yabbcode {
 				parsedAttrs = { attr: '', attrs: {} };
 			} else if (spaceIndex === -1 || (equalsIndex !== -1 && equalsIndex < spaceIndex)) {
 				// Old format: [tag=value]
-				moduleName = (contentToParse.split('=')[0] ?? '').toLowerCase();
+				moduleName = (contentToParse.split('=', 1)[0] ?? '').toLowerCase();
 				parsedAttrs = parseTagAttributes(contentToParse);
 			} else {
 				// New format: [tag attr1 key=value]
-				moduleName = (contentToParse.split(/\s+/)[0] ?? '').toLowerCase();
+				moduleName = (contentToParse.split(/\s+/, 1)[0] ?? '').toLowerCase();
 				parsedAttrs = parseTagAttributes(contentToParse);
 			}
 
@@ -707,10 +735,12 @@ class yabbcode {
 			let lastIndex = 0;
 			for (const [i, tag] of tags.entries()) {
 				const pos = input.indexOf(tag, lastIndex);
-				if (pos !== -1) {
-					tagPositions.push({ pos, tag: tag, placeholder: '[TAG-' + i + ']' });
-					lastIndex = pos + tag.length;
+				if (pos === -1) {
+					continue;
 				}
+
+				tagPositions.push({ pos, tag: tag, placeholder: '[TAG-' + i + ']' });
+				lastIndex = pos + tag.length;
 			}
 
 			if (tagPositions.length > 0) {

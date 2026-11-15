@@ -1,30 +1,31 @@
 name: "Code scanning - action"
 
-permissions:
-  actions: read
-  contents: read
-  security-events: write
-
 on:
   push:
+    branches: [main]
   pull_request:
   schedule:
     - cron: "0 5 * * 3"
 
+permissions:
+  contents: read
+
 jobs:
   CodeQL-Build:
-    # CodeQL runs on ubuntu-latest, windows-latest, and macos-latest
     runs-on: ubuntu-latest
-
+    timeout-minutes: 30
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-
-      # Initializes the CodeQL tools for scanning.
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
-        # Override language selection by uncommenting this and choosing your languages
+        uses: actions/checkout@v7.0.1
         with:
-          languages: javascript-typescript
+          persist-credentials: false
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4.39.3
+        with:
+          languages: javascript-typescript, actions
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4
+        uses: github/codeql-action/analyze@v4.39.3

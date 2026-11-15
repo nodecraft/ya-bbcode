@@ -2,9 +2,9 @@ import { parse } from '@bbob/parser';
 import { Bench } from 'tinybench';
 import xbbcode from 'xbbcode-parser';
 
+import yabbcode from '../dist/ya-bbcode.mjs';
 import stub from './stub.ts';
 import { testCases } from './test-cases.ts';
-import yabbcode from '../dist/ya-bbcode.mjs';
 
 function formatNumber(num: number): string {
 	return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
@@ -87,14 +87,18 @@ async function runBenchmark(name: string, input: string, chTagOnly = false): Pro
 	// Sort results by ops/sec (descending)
 	const results: BenchResult[] = bench.tasks
 		.map((task) => {
+			const result = task.result;
+			if (result.state !== 'completed') {
+				return { name: task.name, opsPerSec: 0, mean: 0, margin: 0 };
+			}
 			return {
 				name: task.name,
-				opsPerSec: task.result?.hz || 0,
-				mean: task.result?.mean || 0,
-				margin: task.result?.rme || 0,
+				opsPerSec: result.throughput.mean,
+				mean: result.latency.mean,
+				margin: result.latency.rme,
 			};
 		})
-		.sort((resultA, resultB) => resultB.opsPerSec - resultA.opsPerSec);
+		.toSorted((resultA, resultB) => resultB.opsPerSec - resultA.opsPerSec);
 
 	// Display results
 	const maxNameLength = Math.max(...results.map(result => result.name.length));
@@ -139,15 +143,15 @@ async function main() {
 	const wins: Record<string, number> = { 'ya-bbcode': 0, 'xbbcode-parser': 0, '@bbob/parser': 0 };
 	for (const results of Object.values(allResults)) {
 		const winner = results[0];
-		if (winner) {
-			const currentWins = wins[winner.name] ?? 0;
-			wins[winner.name] = currentWins + 1;
+		if (!winner) {
+			continue;
 		}
+		wins[winner.name] = (wins[winner.name] ?? 0) + 1;
 	}
 
 	console.log('Wins (fastest in category):');
 	for (const [parser, count] of Object.entries(wins)
-		.sort((entryA, entryB) => entryB[1] - entryA[1])) {
+		.toSorted((entryA, entryB) => entryB[1] - entryA[1])) {
 		const percentage = ((count / Object.keys(allResults).length) * 100).toFixed(0);
 		console.log(`  ${parser}: ${count}/${Object.keys(allResults).length} (${percentage}%)`);
 	}

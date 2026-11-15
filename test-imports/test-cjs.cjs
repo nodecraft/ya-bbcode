@@ -11,8 +11,7 @@ if (result === '<strong>Hello World</strong>') {
 	console.log('✅ CJS require works correctly');
 	// eslint-disable-next-line n/no-process-exit
 	process.exit(0);
-} else {
-	console.error('❌ CJS require failed. Got:', result);
-	// eslint-disable-next-line n/no-process-exit
-	process.exit(1);
 }
+console.error('❌ CJS require failed. Got:', result);
+// eslint-disable-next-line n/no-process-exit
+process.exit(1);

@@ -1,14 +1,6 @@
 # Changelog
 
-## 5.1.1
-
-- Security: fixed an XSS where tags nested inside `[img]` could break out of the `src` attribute. Content tags now receive their inner content with nested tags already resolved, so it is escaped correctly.
-
-## 5.1.0
-
-- Added `autoClose` property for tags that implicitly close (fixes [#214](https://github.com/nodecraft/ya-bbcode/issues/214))
-- List items (`[*]`) now automatically generate closing `</li>` tags
-- Added `[hr]` tag for horizontal rules (Steam BBCode compatibility)
+This file is no longer updated. Release notes for versions after 5.0.0 are on [GitHub Releases](https://github.com/nodecraft/ya-bbcode/releases).
 
 ## 5.0.0
 
