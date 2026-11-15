@@ -1095,6 +1095,8 @@ describe('Linear time', () => {
 		['quoted values that never close', '[quote="a]'.repeat(50000)],
 		['quoted values holding ]', '[quote="a]b"]x'.repeat(50000)],
 		['apostrophes between tags', '[b]it\'s[/b] [i=\'x]'.repeat(50000)],
+		['a long run of spaces before an =', `[quote=b${' '.repeat(200000)}=]x[/quote]`],
+		['a long run of spaces after a quoted value', `[quote="a]"${' '.repeat(200000)}b]x[/quote]`],
 	];
 
 	it.each(inputs)('parses %s without slowing down as they grow', (_name, input) => {

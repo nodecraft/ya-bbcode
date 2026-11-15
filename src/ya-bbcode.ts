@@ -156,10 +156,7 @@ const tabOrNewline = /[\t\n\r]/;
 const relativeUrl = /^\.{0,2}\//;
 const schemeName = /^[a-z][\d+.a-z-]*$/;
 const absoluteUrl = /^[a-z][\d+.a-z-]*:/i;
-// A space-separated `key=value` word, which ends the value of [tag=value key=value]
-const keyedWord = /\s+[^\s=]+=/g;
 const whitespaceFrom = /\s/g;
-const keyedWordNext = /\s+[^\s=\]]+=/y;
 const orderedListTypes = new Set(['1', 'a', 'A', 'i', 'I']);
 // The post details quote buttons add after the name: vBulletin `Name;123`, XenForo and Discourse `Name, post: 1, member: 2`
 const quoteDetails = /;n?\d+$|,\s*\w+:/;
@@ -307,18 +304,48 @@ function whitespaceAt(content: string, from: number): number {
 	return match.index;
 }
 
-// Where the next space-separated `key=value` word starts, or -1
+// Whether whitespace at `index` is followed by a `key=` word, read in one pass since a regex here backtracks on long runs of spaces
+function keyedWordFollows(text: string, index: number): boolean {
+	let at = index;
+	while (at < text.length && whitespace.test(text.charAt(at))) {
+		at++;
+	}
+	if (at === index) {
+		return false;
+	}
+	const keyStart = at;
+	while (at < text.length) {
+		const character = text.charAt(at);
+		if (character === '=') {
+			return at > keyStart;
+		}
+		if (character === ']' || whitespace.test(character)) {
+			return false;
+		}
+		at++;
+	}
+	return false;
+}
+
+// Where the whitespace before the next space-separated `key=value` word starts, or -1
 function keyedWordAt(content: string, from: number): number {
-	// Most values have no other `=`, which settles it without running the regex
+	// Most values have no other `=`, which settles it without looking at each word
 	if (!content.includes('=', from)) {
 		return -1;
 	}
-	keyedWord.lastIndex = from;
-	const match = keyedWord.exec(content);
-	if (match === null) {
-		return -1;
+	let index = whitespaceAt(content, from);
+	while (index < content.length) {
+		if (keyedWordFollows(content, index)) {
+			return index;
+		}
+		// Moving past this whitespace and the word after it means each character is looked at a bounded number of times
+		let wordStart = index;
+		while (wordStart < content.length && whitespace.test(content.charAt(wordStart))) {
+			wordStart++;
+		}
+		index = whitespaceAt(content, wordStart);
 	}
-	return match.index;
+	return -1;
 }
 
 /**
@@ -536,8 +563,7 @@ function closingMark(input: string, scan: QuoteScan, mark: QuoteMark, from: numb
 	let index = input.indexOf(mark.text, from);
 	while (index !== -1 && index < limit) {
 		const after = index + mark.text.length;
-		keyedWordNext.lastIndex = after;
-		if (input.charAt(after) === ']' || keyedWordNext.test(input)) {
+		if (input.charAt(after) === ']' || keyedWordFollows(input, after)) {
 			mark.close = index;
 			mark.closeLimit = index;
 			return index;
