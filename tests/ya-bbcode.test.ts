@@ -662,5 +662,15 @@ describe('Fuzz findings', () => {
 	it('escapes restored tags in raw mode, since they can land inside attributes', () => {
 		const parser = new yabbc({ sanitizeHtml: false, cleanUnmatchable: false });
 		expect(parser.parse('[url][img][url="][/IMG][url]')).toBe('<a href="#"><img src="[url=&quot;]" alt=""/><a href="#">');
+		// Unknown tags and unmatched closing tags are restored at different stages, and both must stay inside the attribute
+		expect(parser.parse('[img][x="]y[/x][/img]')).toBe('<img src="[x=&quot;]y[/x]" alt=""/>');
+		expect(parser.parse('[img]a[/b"][/img]')).toBe('<img src="a[/b&quot;]" alt=""/>');
+	});
+
+	it('converts newlines inside restored tags like the surrounding text', () => {
+		expect(new yabbc({ cleanUnmatchable: false }).parse('a\n[/x\n]b')).toBe('a<br/>[/x<br/>]b');
+		expect(new yabbc({ cleanUnmatchable: false, paragraph: true }).parse('a[/x\n]b')).toBe('<p>a[/x</p><p>]b</p>');
+		expect(new yabbc().parse('[noparse][b\n][/noparse]')).toBe('[b<br/>]');
+		expect(new yabbc({ newline: false }).parse('[x\n]y')).toBe('[x\n]y');
 	});
 });

@@ -69,7 +69,7 @@ function replaceFirst(content: string, search: string, replacement: string): str
 	return content.slice(0, index) + replacement + content.slice(index + search.length);
 }
 
-const sanitizedEntities: { [key: string]: string; } = {
+const sanitizedEntities = {
 	'&amp;': '&',
 	'&lt;': '<',
 	'&gt;': '>',
@@ -78,7 +78,7 @@ const sanitizedEntities: { [key: string]: string; } = {
 };
 
 function unescapeSanitized(value: string): string {
-	return value.replaceAll(/&(?:amp|lt|gt|quot|#39);/g, (entity: string) => sanitizedEntities[entity] ?? entity);
+	return value.replaceAll(/&(?:amp|lt|gt|quot|#39);/g, (entity: string) => sanitizedEntities[entity as keyof typeof sanitizedEntities]);
 }
 
 /**
@@ -409,14 +409,18 @@ class yabbcode {
 		return this.tags[name];
 	}
 
-	#applyLayout(input: string): string {
-		if (this.config.newline) {
-			if (this.config.paragraph) {
-				input = input.replace(this.regex.newline, '</p><p>');
-			} else {
-				input = input.replace(this.regex.newline, '<br/>');
-			}
+	#convertNewlines(input: string): string {
+		if (!this.config.newline) {
+			return input;
 		}
+		if (this.config.paragraph) {
+			return input.replace(this.regex.newline, '</p><p>');
+		}
+		return input.replace(this.regex.newline, '<br/>');
+	}
+
+	#applyLayout(input: string): string {
+		input = this.#convertNewlines(input);
 		if (this.config.paragraph) {
 			input = '<p>' + input + '</p>';
 		}
@@ -772,7 +776,8 @@ class yabbcode {
 				index: i,
 				module: moduleName,
 				isClosing,
-				raw: tag,
+				// Layout runs after placeholders go in, so restored tag text needs its newlines converted to match the text around it
+				raw: this.#convertNewlines(tag),
 				attr: parsedAttrs.attr,
 				attrs: parsedAttrs.attrs,
 				children: [],
@@ -824,13 +829,13 @@ class yabbcode {
 		if (this.config.cleanUnmatchable) {
 			return input.replaceAll(this.regex.placeholders, '');
 		}
-		// Leftovers can sit inside attributes built by content tags, so raw text from unsanitized input must be escaped
+		// Unknown tags are restored before content tags escape their output, but leftovers land after, possibly inside an attribute, so raw input must be escaped here
 		return input.replaceAll(this.regex.placeholders, (_match: string, index: string) => {
-			const raw = tags[Number(index)] ?? '';
-			if (this.config.sanitizeHtml) {
-				return raw;
+			let raw = tags[Number(index)] ?? '';
+			if (!this.config.sanitizeHtml) {
+				raw = escapeHtmlAttr(raw);
 			}
-			return escapeHtmlAttr(raw);
+			return this.#convertNewlines(raw);
 		});
 	}
 }
