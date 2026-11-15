@@ -7,14 +7,31 @@ Yet another BBCode parser.
 
 ## Usage
 
+ya-bbcode works with both `import` and `require`, with TypeScript types for each:
+
 ```javascript
-const yabbcode = require('ya-bbcode');
+import yabbcode from 'ya-bbcode';
+// or: const yabbcode = require('ya-bbcode');
+
 const parser = new yabbcode();
 
 const bbc = '[url=https://nodecraft.com]Visit Nodecraft[/url]';
 parser.parse(bbc);
 // <a href="https://nodecraft.com">Visit Nodecraft</a>
 ```
+
+##### Options
+
+Pass these to the constructor, as in `new yabbcode({ newline: false })`:
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `newline` | `true` | Turn line breaks into `<br/>` |
+| `paragraph` | `false` | Wrap the output in `<p>`, and with `newline` on, start a new paragraph at each line break |
+| `cleanUnmatchable` | `true` | Drop tags that never pair up; when off, they are kept as written |
+| `sanitizeHtml` | `true` | Escape HTML in the input |
+| `allowedSchemes` | `['http', 'https', 'mailto', 'ftp', 'ftps']` | URL schemes allowed in links and images |
+| `caseSensitive` | `false` | Match tag names exactly, so `[signal x]` can be a tag while `[Signal]` stays text. The built-in tags are lowercase |
 
 ##### Add Custom Tags
 
