@@ -494,6 +494,12 @@ describe('Security Tests', () => {
 		expect(output).toMatch(/&(amp;)?quot;/);
 	});
 
+	it('XSS Prevention: nested tags cannot break out of img src', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[img][quote=x onerror=alert(1)]y[/quote][/img]')).toBe('<img src="&lt;blockquote author=&quot;x onerror=alert(1)&quot;&gt;y&lt;/blockquote&gt;" alt=""/>');
+		expect(parser.parse('[img]http://x/[b]a[/b].png[/img]')).toBe('<img src="http://x/&lt;strong&gt;a&lt;/strong&gt;.png" alt=""/>');
+	});
+
 	it('XSS Prevention: HTML entities escaped in attributes', () => {
 		const parser = new yabbc();
 		// Angle brackets and ampersands should be escaped
