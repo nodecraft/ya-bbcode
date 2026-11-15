@@ -29,18 +29,20 @@ const allowedAttributes: Record<string, string[]> = {
 const allowedClasses = new Set(['yabbcode-strike', 'yabbcode-spoiler']);
 const allowedProtocols = new Set(['http:', 'https:', 'mailto:', 'ftp:', 'ftps:']);
 
-function checkHref(href: string): string | undefined {
+const urlAttributes = new Set(['a.href', 'img.src']);
+
+function checkUrl(name: string, url: string): string | undefined {
 	let protocol: string;
 	try {
 		// Resolve the way a browser would, so entity, whitespace and control-character tricks are judged by their real effect.
-		protocol = new URL(href, 'https://base.invalid/').protocol;
+		protocol = new URL(url, 'https://base.invalid/').protocol;
 	} catch {
 		return undefined;
 	}
 	if (allowedProtocols.has(protocol)) {
 		return undefined;
 	}
-	return `href resolves to disallowed protocol ${protocol}: ${JSON.stringify(href)}`;
+	return `${name} resolves to disallowed protocol ${protocol}: ${JSON.stringify(url)}`;
 }
 
 function walk(node: DefaultTreeAdapterTypes.ChildNode, problems: string[]): void {
@@ -61,8 +63,8 @@ function walk(node: DefaultTreeAdapterTypes.ChildNode, problems: string[]): void
 			problems.push(`unexpected attribute ${attr.name} on <${node.tagName}>`);
 			continue;
 		}
-		if (node.tagName === 'a' && attr.name === 'href') {
-			const problem = checkHref(attr.value);
+		if (urlAttributes.has(`${node.tagName}.${attr.name}`)) {
+			const problem = checkUrl(attr.name, attr.value);
 			if (problem) {
 				problems.push(problem);
 			}

@@ -135,6 +135,18 @@ describe('fuzz: parse', () => {
 		);
 	});
 
+	// A trailing unclosed `[` would merge with `[/noparse]` into one tag, so those inputs aren't a closed noparse
+	it('returns noparse content exactly as written', () => {
+		const literal = bbcode.filter(source => !/noparse/i.test(source) && !/\[[^\]]*$/.test(source));
+		fc.assert(
+			fc.property(literal, fc.boolean(), (source, cleanUnmatchable) => {
+				const parser = new yabbc({ sanitizeHtml: false, newline: false, cleanUnmatchable });
+				expect(parser.parse(`[noparse]${source}[/noparse]`)).toBe(source.replaceAll('\0', ''));
+			}),
+			fuzzParams,
+		);
+	});
+
 	// Without sanitizeHtml raw HTML passes through by design, but tag output must still never let input escape an attribute
 	it('produces only safe HTML when sanitizeHtml is off and the input has no raw HTML', () => {
 		fc.assert(
