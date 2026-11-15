@@ -52,6 +52,35 @@ interface TagItem {
 	stackIndex?: number;
 }
 
+// NUL is stripped from input so placeholders can't be forged; a distinct end stops `\0 1 \0 2 \0` reading as placeholder 2.
+const PLACEHOLDER_START = '\0';
+const PLACEHOLDER_END = ';';
+
+function placeholder(index: number): string {
+	return PLACEHOLDER_START + index + PLACEHOLDER_END;
+}
+
+// String#replace expands `$&`, `$'` and `` $` `` in string replacements, which user-controlled attributes could abuse.
+function replaceFirst(content: string, search: string, replacement: string): string {
+	const index = content.indexOf(search);
+	if (index === -1) {
+		return content;
+	}
+	return content.slice(0, index) + replacement + content.slice(index + search.length);
+}
+
+const sanitizedEntities: { [key: string]: string; } = {
+	'&amp;': '&',
+	'&lt;': '<',
+	'&gt;': '>',
+	'&quot;': '"',
+	'&#39;': '\'',
+};
+
+function unescapeSanitized(value: string): string {
+	return value.replaceAll(/&(?:amp|lt|gt|quot|#39);/g, (entity: string) => sanitizedEntities[entity] ?? entity);
+}
+
 /**
  * Escapes HTML attribute values to prevent XSS
  * Encodes quotes, angle brackets, and other special characters
@@ -67,12 +96,26 @@ function escapeHtmlAttr(value: string): string {
 	return String(value).replaceAll(/["&'<>]/g, (char: string) => attrEntities[char] || char);
 }
 
+// Mirrors the WHATWG URL parser, which trims C0 controls and spaces and drops tabs/newlines, so `java\tscript:` can't slip through.
+function normalizeUrl(url: string): string {
+	let start = 0;
+	let end = url.length;
+	// Comparing against ' ' matches every character from U+0000 to U+0020
+	while (start < end && url.charAt(start) <= ' ') {
+		start++;
+	}
+	while (end > start && url.charAt(end - 1) <= ' ') {
+		end--;
+	}
+	return url.slice(start, end).replaceAll(/[\t\n\r]/g, '');
+}
+
 /**
  * Validates and sanitizes URLs to prevent javascript: and data: URL attacks
  * Only allows safe URL schemes based on the allowedSchemes list
  */
 function sanitizeUrl(url: string, allowedSchemes: string[]): string {
-	const trimmed = String(url).trim();
+	const trimmed = normalizeUrl(String(url));
 	if (!trimmed) {
 		return '#';
 	}
@@ -166,12 +209,12 @@ class yabbcode {
 	tags: TagsMap = {
 		'url': {
 			type: 'replace',
-			open: attr => `<a href="${escapeHtmlAttr(sanitizeUrl(attr, this.config.allowedSchemes ?? ['http', 'https', 'mailto', 'ftp', 'ftps']))}">`,
+			open: attr => `<a href="${escapeHtmlAttr(sanitizeUrl(this.#unsanitize(attr), this.config.allowedSchemes ?? ['http', 'https', 'mailto', 'ftp', 'ftps']))}">`,
 			close: '</a>',
 		},
 		'quote': {
 			type: 'replace',
-			open: attr => `<blockquote author="${escapeHtmlAttr(attr)}">`,
+			open: attr => `<blockquote author="${escapeHtmlAttr(this.#unsanitize(attr))}">`,
 			close: '</blockquote>',
 		},
 		'b': {
@@ -261,7 +304,7 @@ class yabbcode {
 				if (!content) {
 					return '';
 				}
-				return `<img src="${escapeHtmlAttr(content)}" alt="${escapeHtmlAttr(attr)}"/>`;
+				return `<img src="${escapeHtmlAttr(this.#unsanitize(content))}" alt="${escapeHtmlAttr(this.#unsanitize(attr))}"/>`;
 			},
 		},
 		'noparse': {
@@ -272,7 +315,7 @@ class yabbcode {
 	regex = {
 		tags: /(\[[^\]^]+\])/g,
 		newline: /\r\n|\r|\n/g,
-		placeholders: /\[TAG-[1-9]+\]/g,
+		placeholders: /\0(\d+);/g,
 	};
 
 	config: Config;
@@ -289,11 +332,10 @@ class yabbcode {
 			}
 			// do the replace
 			if (open && !tag.isClosing) {
-				//content = content
-				content = content.replace('[TAG-' + tag.index + ']', open);
+				content = replaceFirst(content, placeholder(tag.index), open);
 			}
 			if (close && tag.closing) {
-				content = content.replace('[TAG-' + tag.closing.index + ']', close);
+				content = replaceFirst(content, placeholder(tag.closing.index), close);
 			}
 			return content;
 		},
@@ -301,8 +343,8 @@ class yabbcode {
 			if (!tag.closing) {
 				return content;
 			}
-			const openTag = '[TAG-' + tag.index + ']';
-			const closeTag = '[TAG-' + tag.closing.index + ']';
+			const openTag = placeholder(tag.index);
+			const closeTag = placeholder(tag.closing.index);
 			const start = content.indexOf(openTag);
 			const end = content.indexOf(closeTag);
 			let replace = module.replace;
@@ -318,12 +360,12 @@ class yabbcode {
 			return contentStart + replace + contentEnd;
 		},
 		ignore: (tag: TagItem, _module: IgnoreTag, content: string): string => {
-			const openTag = '[TAG-' + tag.index + ']';
+			const openTag = placeholder(tag.index);
 			const start = content.indexOf(openTag);
 			let closeTag = '';
 			let end = content.length;
 			if (tag.closing) {
-				closeTag = '[TAG-' + tag.closing.index + ']';
+				closeTag = placeholder(tag.closing.index);
 				end = content.indexOf(closeTag);
 			}
 			let innerContent = content.slice(start + openTag.length, end);
@@ -359,11 +401,41 @@ class yabbcode {
 		}
 	}
 
+	// Tag names come from user input, so inherited keys like `constructor` must not resolve to Object.prototype members.
+	#getTag(name: string): TagDefinition | undefined {
+		if (!Object.hasOwn(this.tags, name)) {
+			return undefined;
+		}
+		return this.tags[name];
+	}
+
+	#applyLayout(input: string): string {
+		if (this.config.newline) {
+			if (this.config.paragraph) {
+				input = input.replace(this.regex.newline, '</p><p>');
+			} else {
+				input = input.replace(this.regex.newline, '<br/>');
+			}
+		}
+		if (this.config.paragraph) {
+			input = '<p>' + input + '</p>';
+		}
+		return input;
+	}
+
+	// Built-in attribute tags escape for themselves, so undo parse()'s sanitizing first to avoid double-escaping `&`.
+	#unsanitize(value: string): string {
+		if (!this.config.sanitizeHtml) {
+			return value;
+		}
+		return unescapeSanitized(value);
+	}
+
 	#ignoreLoop(tagsMap: TagItem[], content: string): string {
 		for (const tag of tagsMap) {
-			content = content.replace('[TAG-' + tag.index + ']', tag.raw);
+			content = replaceFirst(content, placeholder(tag.index), tag.raw);
 			if (tag.closing) {
-				content = content.replace('[TAG-' + tag.closing.index + ']', tag.closing.raw);
+				content = replaceFirst(content, placeholder(tag.closing.index), tag.closing.raw);
 			}
 			if (tag.children.length > 0) {
 				content = this.#ignoreLoop(tag.children, content);
@@ -381,7 +453,7 @@ class yabbcode {
 			// (content) are usually nested, so a top-level-only check would miss them
 			// and incorrectly take the optimized path that ignores those behaviors.
 			const hasSpecialType = (tag: TagItem): boolean => {
-				const module = this.tags[tag.module];
+				const module = this.#getTag(tag.module);
 				if (module) {
 					if (module.type === 'content' || module.type === 'ignore') {
 						return true;
@@ -406,7 +478,7 @@ class yabbcode {
 				continue;
 			}
 
-			let module = this.tags[tag.module];
+			let module = this.#getTag(tag.module);
 			if (!module) {
 				// ignore invalid BBCode
 				module = {
@@ -428,7 +500,7 @@ class yabbcode {
 					open = open(tag.attr, tag.attrs);
 				}
 				if (open && !tag.isClosing) {
-					content = content.replace('[TAG-' + tag.index + ']', open);
+					content = replaceFirst(content, placeholder(tag.index), open);
 				}
 
 				// Step 2: Process children (before closing, so parent's close placeholder is still available)
@@ -449,16 +521,16 @@ class yabbcode {
 					for (let siblingIndex = i + 1; siblingIndex < tagsMap.length; siblingIndex++) {
 						const sibling = tagsMap[siblingIndex];
 						if (sibling?.module === tag.module) {
-							insertBefore = '[TAG-' + sibling.index + ']';
+							insertBefore = placeholder(sibling.index);
 							break;
 						}
 					}
 					if (insertBefore === undefined && parentClosingTagIndex !== undefined) {
-						insertBefore = '[TAG-' + parentClosingTagIndex + ']';
+						insertBefore = placeholder(parentClosingTagIndex);
 					}
 
 					if (insertBefore && autoClose) {
-						content = content.replace(insertBefore, autoClose + insertBefore);
+						content = replaceFirst(content, insertBefore, autoClose + insertBefore);
 					}
 				}
 
@@ -468,7 +540,7 @@ class yabbcode {
 					close = close(tag.attr, tag.attrs);
 				}
 				if (close && tag.closing) {
-					content = content.replace('[TAG-' + tag.closing.index + ']', close);
+					content = replaceFirst(content, placeholder(tag.closing.index), close);
 				}
 			} else if (module.type === 'content') {
 				// Resolve children first so replace() receives final HTML it can escape, rather than placeholders that expand into raw HTML after escaping
@@ -490,7 +562,7 @@ class yabbcode {
 		const replacements = new Map<string, string>();
 
 		const processTag = (tag: TagItem) => {
-			let module = this.tags[tag.module];
+			let module = this.#getTag(tag.module);
 			if (!module) {
 				module = {
 					type: 'replace',
@@ -513,10 +585,10 @@ class yabbcode {
 				close = close(tag.attr, tag.attrs);
 			}
 			if (open && !tag.isClosing) {
-				replacements.set('[TAG-' + tag.index + ']', open);
+				replacements.set(placeholder(tag.index), open);
 			}
 			if (close && tag.closing) {
-				replacements.set('[TAG-' + tag.closing.index + ']', close);
+				replacements.set(placeholder(tag.closing.index), close);
 			}
 
 			// Process children recursively
@@ -530,9 +602,8 @@ class yabbcode {
 			processTag(tag);
 		}
 
-		// Single-pass replacement using regex
-		const placeholderRegex = /\[TAG-(\d+)\]/g;
-		return content.replaceAll(placeholderRegex, (match: string) => replacements.get(match) || '');
+		// Unmatched placeholders are kept so parse() handles them per cleanUnmatchable
+		return content.replaceAll(this.regex.placeholders, (match: string) => replacements.get(match) ?? match);
 	}
 
 	#tagLoop(tagsMap: TagItem[], parent?: number): TagItem[] {
@@ -654,7 +725,7 @@ class yabbcode {
 		) {
 			return '';
 		}
-		let input = String(bbcInput);
+		let input = String(bbcInput).replaceAll(PLACEHOLDER_START, '');
 		if (this.config.sanitizeHtml) {
 			// Batch HTML entity replacement for better performance
 			const htmlEntities = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', '\'': '&#39;' };
@@ -666,20 +737,9 @@ class yabbcode {
 		// split input into tags by index
 		const tags = String(input).match(this.regex.tags);
 
-		if (this.config.newline) {
-			if (this.config.paragraph) {
-				input = input.replace(this.regex.newline, '</p><p>');
-			} else {
-				input = input.replace(this.regex.newline, '<br/>');
-			}
-		}
-		if (this.config.paragraph) {
-			input = '<p>' + input + '</p>';
-		}
-
 		// handle when no tags are present
 		if (!tags || tags.length === 0) {
-			return input;
+			return this.#applyLayout(input);
 		}
 		// Build tag map and replace with placeholders
 		for (const [i, tag] of tags.entries()) {
@@ -727,7 +787,7 @@ class yabbcode {
 		if (tags.length <= 3) {
 			// Fast path for few tags - direct replacement is faster
 			for (const [i, tag] of tags.entries()) {
-				input = input.replace(tag, '[TAG-' + i + ']');
+				input = replaceFirst(input, tag, placeholder(i));
 			}
 		} else {
 			// Batch replacement for many tags
@@ -739,7 +799,7 @@ class yabbcode {
 					continue;
 				}
 
-				tagPositions.push({ pos, tag: tag, placeholder: '[TAG-' + i + ']' });
+				tagPositions.push({ pos, tag: tag, placeholder: placeholder(i) });
 				lastIndex = pos + tag.length;
 			}
 
@@ -755,14 +815,23 @@ class yabbcode {
 				input = parts.join('');
 			}
 		}
+		// Only after placeholders are in, so a tag spanning lines still matches its raw text
+		input = this.#applyLayout(input);
 		// loop through each tag to create nested elements
 		tagsMap = this.#tagLoop(tagsMap);
-		// put back all non-found matches?
 		input = this.#contentLoop(tagsMap, input);
+		// Placeholders are internal markers, so leftovers become nothing or the original BBCode, never leak
 		if (this.config.cleanUnmatchable) {
-			input = input.replace(this.regex.placeholders, '');
+			return input.replaceAll(this.regex.placeholders, '');
 		}
-		return input;
+		// Leftovers can sit inside attributes built by content tags, so raw text from unsanitized input must be escaped
+		return input.replaceAll(this.regex.placeholders, (_match: string, index: string) => {
+			const raw = tags[Number(index)] ?? '';
+			if (this.config.sanitizeHtml) {
+				return raw;
+			}
+			return escapeHtmlAttr(raw);
+		});
 	}
 }
 
