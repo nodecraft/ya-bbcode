@@ -82,7 +82,6 @@ describe('ya-bbcode', () => {
 		// @ts-expect-error - Testing invalid input type
 		expect(parser.parse([])).toBe('');
 		// @ts-expect-error - Testing invalid input type
-		// eslint-disable-next-line @typescript-eslint/no-empty-function
 		expect(parser.parse(() => {})).toBe('');
 		expect(parser.parse(1)).toBe('1');
 		expect(parser.parse(12)).toBe('12');
