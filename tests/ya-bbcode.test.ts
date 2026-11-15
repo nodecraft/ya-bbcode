@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { benchCases } from '../benchmark/test-cases.ts';
 import yabbc from '../dist/ya-bbcode.mjs';
 
 const newlineTest = `[h1]Nodecraft[/h1]
@@ -287,16 +288,14 @@ describe('ya-bbcode', () => {
 		// Unmatched opening tags don't get closing tags
 		expect(parser.parse('[b][i]test[/i]')).toBe('<strong><i>test</i>');
 	});
-	it('Batch replacement path (>3 tags)', () => {
+	it('Several sibling tags', () => {
 		const parser = new yabbc();
-		// Test with 5 tags to trigger batch replacement path
 		const input = '[b]one[/b] [i]two[/i] [u]three[/u]';
 		expect(parser.parse(input)).toBe('<strong>one</strong> <i>two</i> <u>three</u>');
 	});
-	it('Optimized path (>50 tags)', () => {
+	it('Many sibling tags (>50)', () => {
 		const parser = new yabbc();
-		// Create input with >50 tags (26 pairs = 52 tags) to trigger optimized path
-		// Must be all replace-type tags to trigger optimization
+		// Large documents used to take a separate code path, so this size stays covered
 		let input = '';
 		for (let i = 0; i < 26; i++) {
 			input += '[b]test[/b] ';
@@ -390,8 +389,7 @@ describe('ya-bbcode', () => {
 	});
 	it('autoClose works in large documents (>50 top-level tags)', () => {
 		const parser = new yabbc();
-		// >50 top-level replace tags would otherwise trigger the optimized path,
-		// which must not skip autoClose on nested [*] items.
+		// Large documents used to take a separate code path that skipped autoClose on nested [*] items
 		let input = '';
 		for (let i = 0; i < 60; i++) {
 			input += '[b]x[/b]';
@@ -634,7 +632,7 @@ describe('Placeholder handling', () => {
 	it('restores unmatched tags as written when cleanUnmatchable is off', () => {
 		const parser = new yabbc({ cleanUnmatchable: false });
 		expect(parser.parse('[/b]stray')).toBe('[/b]stray');
-		// >50 top-level tags takes the optimized path, which must follow the same rule
+		// Large documents used to take a separate code path, which must follow the same rule
 		expect(parser.parse('[b]x[/b]'.repeat(60) + '[/i]')).toBe('<strong>x</strong>'.repeat(60) + '[/i]');
 	});
 
@@ -708,5 +706,168 @@ describe('Fuzz findings', () => {
 		expect(new yabbc({ cleanUnmatchable: false, paragraph: true }).parse('a[/x\n]b')).toBe('<p>a[/x</p><p>]b</p>');
 		expect(new yabbc().parse('[noparse][b\n][/noparse]')).toBe('[b<br/>]');
 		expect(new yabbc({ newline: false }).parse('[x\n]y')).toBe('[x\n]y');
+	});
+});
+
+describe('Nesting', () => {
+	it('renders nested tags when their parent has a later sibling', () => {
+		const parser = new yabbc();
+		// The [i] used to be dropped because [b] is followed by [u] inside the same parent
+		expect(parser.parse('[quote][b][i]x[/i][/b][u]y[/u][/quote]')).toBe('<blockquote author=""><strong><i>x</i></strong><u>y</u></blockquote>');
+		expect(parser.parse('[b][i][u]a[/u][/i][/b][b][i]b[/i][/b]')).toBe('<strong><i><u>a</u></i></strong><strong><i>b</i></strong>');
+	});
+
+	it('renders tags that come after an unclosed tag', () => {
+		const parser = new yabbc();
+		// List items never close, and used to swallow every top-level tag after the list
+		expect(parser.parse('[list][*]a[*]b[/list][b]bold[/b]')).toBe('<ul><li>a</li><li>b</li></ul><strong>bold</strong>');
+		expect(parser.parse('[list][*]a[b]b[/b][*]c[/list] [olist][*]1[/*][*]2[/olist]')).toBe('<ul><li>a<strong>b</strong></li><li>c</li></ul> <ol><li>1</li><li>2</li></ol>');
+		expect(parser.parse('[b]unclosed [i]x[/i] [u]y[/u]')).toBe('<strong>unclosed <i>x</i> <u>y</u>');
+	});
+
+	it('matches tag names regardless of case', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[B]x[/b] [Quote=A]y[/QUOTE] [URL=https://example.com]z[/url]')).toBe('<strong>x</strong> <blockquote author="A">y</blockquote> <a href="https://example.com">z</a>');
+	});
+
+	it('nests far deeper than the call stack allows', () => {
+		const depth = 50000;
+		const output = new yabbc().parse(`${'[b]'.repeat(depth)}x${'[/b]'.repeat(depth)}`);
+		expect(output).toBe(`${'<strong>'.repeat(depth)}x${'</strong>'.repeat(depth)}`);
+	});
+
+	it('uses tags registered between parse() calls', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[b]x[/b][mark]y[/mark]')).toBe('<strong>x</strong>[mark]y[/mark]');
+		parser.registerTag('b', { type: 'replace', open: '<b>', close: '</b>' });
+		parser.registerTag('mark', { type: 'replace', open: '<mark>', close: '</mark>' });
+		expect(parser.parse('[b]x[/b][mark]y[/mark]')).toBe('<b>x</b><mark>y</mark>');
+	});
+
+	it('lets a tag function call parse() on the same parser', () => {
+		const parser = new yabbc();
+		parser.registerTag('inner', {
+			type: 'content',
+			replace: (_attr, content) => `(${parser.parse(`[b]${content}[/b]`)})`,
+		});
+		expect(parser.parse('[i]a[/i][inner]x[/inner][u]b[/u]')).toBe('<i>a</i>(<strong>x</strong>)<u>b</u>');
+	});
+
+	it('passes attributes to close when open is a plain string', () => {
+		const parser = new yabbc();
+		parser.registerTag('note', {
+			type: 'replace',
+			open: '<aside>',
+			close: (attr, attrs) => `<!--${attr}:${String(attrs.kind)}--></aside>`,
+		});
+		expect(parser.parse('[note kind=tip]x[/note]')).toBe('<aside>x<!--tip:tip--></aside>');
+	});
+});
+
+describe('Newlines', () => {
+	it(String.raw`treats \r\n, \r and \n each as one newline`, () => {
+		expect(new yabbc().parse('a\r\nb\rc\nd\n\re')).toBe('a<br/>b<br/>c<br/>d<br/><br/>e');
+		expect(new yabbc({ paragraph: true }).parse('a\r\n[b]x[/b]')).toBe('<p>a</p><p><strong>x</strong></p>');
+	});
+
+	it(String.raw`keeps \r and \n separate when a tag sits between them`, () => {
+		expect(new yabbc().parse('a\r[b]x[/b]\nb')).toBe('a<br/><strong>x</strong><br/>b');
+	});
+
+	it('converts long runs of mixed line endings between tags', () => {
+		// Enough newlines in one piece of text to go past the handful that are spliced in individually
+		const lines = 'one\r\ntwo\rthree\nfour\n\r'.repeat(6);
+		const converted = 'one<br/>two<br/>three<br/>four<br/><br/>'.repeat(6);
+		expect(new yabbc().parse(`[b]${lines}[/b]${lines}`)).toBe(`<strong>${converted}</strong>${converted}`);
+		expect(new yabbc({ paragraph: true }).parse(lines)).toBe(`<p>${converted.replaceAll('<br/>', '</p><p>')}</p>`);
+		expect(new yabbc({ newline: false }).parse(lines)).toBe(lines);
+	});
+});
+
+describe('Mis-nested content tags', () => {
+	function withBox() {
+		const parser = new yabbc();
+		parser.registerTag('box', {
+			type: 'content',
+			replace: (_attr, content) => `<div>${content}</div>`,
+		});
+		parser.registerTag('item', {
+			type: 'replace',
+			open: '<div class="item">',
+			close: null,
+			autoClose: '</div>',
+		});
+		return parser;
+	}
+
+	it('still renders an image whose closing tag crosses another tag', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[b][img]https://example.com/a.png[/b][/img]')).toBe('<strong><img src="https://example.com/a.png" alt=""/>');
+		expect(parser.parse('[url=https://example.com][img]https://example.com/a.png[/url][/img]')).toBe('<a href="https://example.com"><img src="https://example.com/a.png" alt=""/>');
+	});
+
+	it('resolves a tag that closes inside a content tag it was opened outside of', () => {
+		const parser = withBox();
+		expect(parser.parse('[b][box]x[/b]y[/box]')).toBe('<strong><div>x</strong>y</div>');
+		expect(parser.parse('[b][box]a[box]b[/b]c[/box]d[/box]')).toBe('<strong><div>a<div>b</strong>c</div>d</div>');
+	});
+
+	it('auto-closes items on both sides of a crossing tag', () => {
+		const parser = withBox();
+		expect(parser.parse('[b][box][item]a[/b][item]b[/box]')).toBe('<strong><div><div class="item">a</div></strong><div class="item">b</div></div>');
+	});
+
+	it('leaves a content tag unmatched when another content tag discarded one of its ends', () => {
+		const parser = new yabbc();
+		// The outer [img] drops everything unresolved inside it, including both tags of the inner [img]
+		expect(parser.parse('[b][img]a[img]b[/img]c[/b]d[/img]')).toBe('<strong><img src="abcd" alt=""/>');
+	});
+
+	it('does not leak a placeholder that a tag function produces itself', () => {
+		const parser = new yabbc();
+		parser.registerTag('decode', {
+			type: 'content',
+			replace: (_attr, content) => decodeURIComponent(content),
+		});
+		// %00 decodes to the NUL that starts a placeholder, which user text is otherwise never allowed to contain
+		expect(parser.parse('[decode]a%001;b[/decode][b]x[/b]')).toBe('ab<strong>x</strong>');
+	});
+
+	it('cleans up or restores unmatched tags that a content tag repeats', () => {
+		const twice = { type: 'content', replace: (_attr: string, content: string) => content + content } as const;
+		expect(new yabbc().registerTag('twice', twice).parse('[twice]a[/b]c[/twice]')).toBe('acac');
+		expect(new yabbc({ cleanUnmatchable: false }).registerTag('twice', twice).parse('[twice]a[/b]c[/twice]')).toBe('a[/b]ca[/b]c');
+	});
+});
+
+describe('Benchmark cases', () => {
+	it.each(benchCases)('$name renders the expected HTML', ({ input, expected, chOnly }) => {
+		const parser = new yabbc();
+		if (chOnly) {
+			parser.registerTag('ch', { type: 'replace', open: '<div>', close: '</div>' });
+		}
+		expect(parser.parse(input)).toBe(expected);
+	});
+});
+
+describe('Linear time', () => {
+	// Before parsing became a single pass, each of these took from seconds to minutes or overflowed the stack
+	const caseVariants = Array.from({ length: 20000 }, (_, index) => {
+		const letters = [...'abcdefghijklmnop'].map((letter, bit) => (index & (1 << bit) ? letter.toUpperCase() : letter));
+		return `[${letters.join('')}]`;
+	}).join('');
+	const inputs: [string, string][] = [
+		['open brackets', '['.repeat(200000)],
+		['open brackets before a caret', `${'['.repeat(200000)}^]`],
+		['unclosed tags and stray closing tags', '[b]'.repeat(50000) + '[/i]'.repeat(50000)],
+		['unclosed list items', `[list]${'[*] item\n'.repeat(50000)}[/list]`],
+		['images', '[img]https://example.com/a.png[/img]'.repeat(50000)],
+		['case variants of one unclosed tag', caseVariants],
+	];
+
+	it.each(inputs)('parses %s without slowing down as they grow', (_name, input) => {
+		const start = performance.now();
+		new yabbc().parse(input);
+		expect(performance.now() - start).toBeLessThan(2000);
 	});
 });
