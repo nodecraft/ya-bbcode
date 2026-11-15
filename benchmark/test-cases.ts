@@ -48,17 +48,18 @@ server.cfg -> maxplayers=${number}
 [noparse][b]not bold[/b][/noparse]
 [hr][/hr]`;
 
-const guideSectionHtml = (number: number): string => `<h1>Chapter ${number}: Getting Started</h1><br/>`
-	+ '<strong>Requirements</strong><br/>'
-	+ '<ul><br/>'
-	+ `<li> A copy of the game (<a href="https://store.example.com/app/${number}">store page</a>)<br/></li>`
-	+ '<li> At least <u>4 GB</u> of RAM<br/></li>'
-	+ '<li> Patience &amp; a <i>good</i> connection<br/></li>'
-	+ '</ul><br/>'
-	+ `<img src="https://cdn.example.com/guides/${number}/overview.png" alt="Overview ${number}"/><br/>`
-	+ `<blockquote author="Player ${number}">This saved me hours, thanks!</blockquote><br/>`
+// Block tags drop the newline on each side of them, so only newlines between inline content become <br/>
+const guideSectionHtml = (number: number): string => `<h1>Chapter ${number}: Getting Started</h1>`
+	+ '<strong>Requirements</strong>'
+	+ '<ul>'
+	+ `<li> A copy of the game (<a href="https://store.example.com/app/${number}">store page</a>)</li>`
+	+ '<li> At least <u>4 GB</u> of RAM</li>'
+	+ '<li> Patience &amp; a <i>good</i> connection</li>'
+	+ '</ul>'
+	+ `<img src="https://cdn.example.com/guides/${number}/overview.png" alt="Overview ${number}"/>`
+	+ `<blockquote author="Player ${number}">This saved me hours, thanks!</blockquote>`
 	+ `<code><br/>server.cfg -&gt; maxplayers=${number}<br/></code><br/>`
-	+ '[b]not bold[/b]<br/>'
+	+ '[b]not bold[/b]'
 	+ '<hr/>';
 
 const noparseBody = numbered(30, number => `[b]bold ${number}[/b] [url=https://example.com/${number}]link[/url] [*] item`).join('\n');
@@ -97,17 +98,17 @@ function hello() {
 [/code]
 
 [spoiler]This is a hidden message that only shows when you click[/spoiler]`,
-		expected: '<h1>Welcome to Our Forum</h1><br/>'
-			+ '<blockquote author="Admin"><br/>'
-			+ 'Welcome everyone! Here are the <strong>forum rules</strong>:<br/>'
-			+ '<ul><br/>'
-			+ '<li> Be respectful to other members<br/></li>'
-			+ '<li> No spam or advertising<br/></li>'
-			+ '<li> Stay on topic<br/></li>'
-			+ '<li> Use appropriate language<br/></li>'
-			+ '</ul><br/>'
-			+ '</blockquote><br/><br/>'
-			+ '<h2>Getting Started</h2><br/>'
+		expected: '<h1>Welcome to Our Forum</h1>'
+			+ '<blockquote author="Admin">'
+			+ 'Welcome everyone! Here are the <strong>forum rules</strong>:'
+			+ '<ul>'
+			+ '<li> Be respectful to other members</li>'
+			+ '<li> No spam or advertising</li>'
+			+ '<li> Stay on topic</li>'
+			+ '<li> Use appropriate language</li>'
+			+ '</ul>'
+			+ '</blockquote><br/>'
+			+ '<h2>Getting Started</h2>'
 			+ 'To get started, please <a href="https://example.com/profile">create your profile</a> and introduce yourself.<br/><br/>'
 			+ '<code><br/>function hello() {<br/>  console.log(&quot;Hello from the forum!&quot;);<br/>}<br/></code><br/><br/>'
 			+ '<span class="yabbcode-spoiler">This is a hidden message that only shows when you click</span>',
@@ -128,19 +129,19 @@ This is getting [strike]complicated[/strike] interesting!
 [*] Point [u]three[/u]
 [/list]
 [/quote]`,
-		expected: '<blockquote author="User1"><br/>'
-			+ '<blockquote author="User2"><br/>'
-			+ '<blockquote author="User3"><br/>'
-			+ '<strong>Original message</strong> with <i>nested</i> <u>formatting</u><br/>'
-			+ '</blockquote><br/>'
-			+ 'I agree! Here&#39;s my <a href="https://example.com">link</a><br/>'
-			+ '</blockquote><br/>'
-			+ 'This is getting <span class="yabbcode-strike">complicated</span> interesting!<br/>'
-			+ '<ul><br/>'
-			+ '<li> Point <strong>one</strong><br/></li>'
-			+ '<li> Point <i>two</i><br/></li>'
-			+ '<li> Point <u>three</u><br/></li>'
-			+ '</ul><br/>'
+		expected: '<blockquote author="User1">'
+			+ '<blockquote author="User2">'
+			+ '<blockquote author="User3">'
+			+ '<strong>Original message</strong> with <i>nested</i> <u>formatting</u>'
+			+ '</blockquote>'
+			+ 'I agree! Here&#39;s my <a href="https://example.com">link</a>'
+			+ '</blockquote>'
+			+ 'This is getting <span class="yabbcode-strike">complicated</span> interesting!'
+			+ '<ul>'
+			+ '<li> Point <strong>one</strong></li>'
+			+ '<li> Point <i>two</i></li>'
+			+ '<li> Point <u>three</u></li>'
+			+ '</ul>'
 			+ '</blockquote>',
 	},
 	{
@@ -156,7 +157,7 @@ This is getting [strike]complicated[/strike] interesting!
 	{
 		name: 'List Heavy (50 items)',
 		input: `[list]\n${numbered(50, number => `[*] List item ${number} with [b]bold[/b] and [i]italic[/i]`).join('\n')}\n[/list]`,
-		expected: `<ul><br/>${numbered(50, number => `<li> List item ${number} with <strong>bold</strong> and <i>italic</i><br/></li>`).join('')}</ul>`,
+		expected: `<ul>${numbered(50, number => `<li> List item ${number} with <strong>bold</strong> and <i>italic</i></li>`).join('')}</ul>`,
 	},
 	{
 		name: 'Image Gallery (12 linked images)',
@@ -187,14 +188,14 @@ This is getting [strike]complicated[/strike] interesting!
 [list][*]one[*]two [img]never closed`,
 		expected: '<strong>unclosed bold <i>italic</i> with a stray  closer<br/>'
 			+ '[unknown]unknown tag[/unknown] and [color=red]unsupported[/color]<br/>'
-			+ '<a href="#">no href</a> then crossed <strong>bold <i>both</strong> italic</i><br/>'
-			+ '<blockquote author="A &quot;quoted&quot; &lt;name&gt;">escaped attribute</blockquote> [ not a tag ] [] [/]<br/>'
+			+ '<a href="#">no href</a> then crossed <strong>bold <i>both</strong> italic</i>'
+			+ '<blockquote author="A &quot;quoted&quot; &lt;name&gt;">escaped attribute</blockquote> [ not a tag ] [] [/]'
 			+ '<ul><li>one</li><li>two never closed',
 	},
 	{
 		name: 'Guide (8 mixed sections)',
 		input: numbered(8, guideSection).join('\n'),
-		expected: numbered(8, guideSectionHtml).join('<br/>'),
+		expected: numbered(8, guideSectionHtml).join(''),
 	},
 	{
 		name: 'Large Document (BBob stub)',

@@ -12,20 +12,38 @@ interface TagAttributes {
 	[key: string]: string | boolean;
 }
 
+/**
+ * Builds a replace tag's HTML. `content` is the text between the opening and closing tag exactly as written
+ * (HTML-escaped when sanitizeHtml is on, inner BBCode left as is), or empty when the tag never closes.
+ */
+type ReplaceHtml = (attr: string, attrs: TagAttributes, content: string) => string;
+
 interface ReplaceTag {
 	type: 'replace';
-	open: ((attr: string, attrs: TagAttributes) => string) | string;
-	close: ((attr: string, attrs: TagAttributes) => string) | string | null;
+	open: ReplaceHtml | string;
+	close: ReplaceHtml | string | null;
 	/**
 	 * HTML to insert when the tag implicitly closes (e.g., before next sibling or parent close).
 	 * Useful for tags like [*] that don't have explicit closing tags in BBCode.
 	 */
-	autoClose?: ((attr: string, attrs: TagAttributes) => string) | string;
+	autoClose?: ReplaceHtml | string;
+	/**
+	 * Renders as a block element, so one newline on each side of its opening and closing tags is dropped
+	 * instead of becoming a stray `<br/>`. Has no effect when `newline` is off or `paragraph` is on.
+	 */
+	block?: boolean;
 }
 
 interface ContentTag {
 	type: 'content';
 	replace: ((attr: string, content: string, attrs: TagAttributes) => string) | string;
+	/** See {@link ReplaceTag.block} */
+	block?: boolean;
+	/**
+	 * Hands `replace` the content as written: BBCode inside is not parsed and newlines are not converted.
+	 * It is still HTML-escaped when sanitizeHtml is on; `parser.unescapeHtml()` gives back the original text.
+	 */
+	raw?: boolean;
 }
 
 interface IgnoreTag {
@@ -44,6 +62,11 @@ interface TagKind {
 	definition: TagDefinition | undefined;
 	// The most recent unclosed tag of this name, so a closing tag finds its partner without searching
 	lastOpen: OpenTag | undefined;
+	block: boolean;
+	// BBCode inside is plain text, as for noparse and raw content tags
+	literal: boolean;
+	// Newlines inside are kept as written too
+	raw: boolean;
 }
 
 // The text between a tag's brackets and the kind it names
@@ -70,8 +93,40 @@ interface OpenTag {
 }
 
 // One parse() call's working state, kept off the instance so a tag function can safely call parse() again
+// How quote marks around attribute values appear in the input, which parse() may already have HTML-escaped
+interface Quotes {
+	double: string;
+	single: string;
+	// `=` then the mark, which is how a quoted value starts
+	doubleOpener: string;
+	singleOpener: string;
+}
+
+const rawQuotes: Quotes = { double: '"', single: '\'', doubleOpener: '="', singleOpener: '=\'' };
+const escapedQuotes: Quotes = { double: '&quot;', single: '&#39;', doubleOpener: '=&quot;', singleOpener: '=&#39;' };
+
+// One kind of quote mark, remembering where the next ones are so the input is only searched once
+interface QuoteMark {
+	text: string;
+	opener: string;
+	// The next opener at or after the last position searched from
+	next: number;
+	// The last search for a closing mark: from where, what it found (Infinity for none), and up to where that answer holds
+	closeFrom: number;
+	close: number;
+	closeLimit: number;
+}
+
+interface QuoteScan {
+	double: QuoteMark;
+	single: QuoteMark;
+	// The next newline at or after the last position searched from, since a quoted value never spans lines
+	lineEnd: number;
+}
+
 interface Doc {
 	input: string;
+	quotes: Quotes;
 	// What a newline in text becomes, or undefined when newlines are kept
 	lineBreak: string | undefined;
 	// Output as [text, slot, text, slot, ..., text]: each tag owns the slot at 2n+1, undefined until something resolves it
@@ -91,6 +146,7 @@ interface Doc {
 const PLACEHOLDER_START = '\0';
 const PLACEHOLDER_END = ';';
 const PARAGRAPH_BREAK = '</p><p>';
+const LINE_BREAK = '<br/>';
 
 const newlines = /\r\n|\r|\n/g;
 const placeholders = /\0(\d+);/g;
@@ -99,6 +155,15 @@ const escapable = /["&'<>]/g;
 const tabOrNewline = /[\t\n\r]/;
 const relativeUrl = /^\.{0,2}\//;
 const schemeName = /^[a-z][\d+.a-z-]*$/;
+const absoluteUrl = /^[a-z][\d+.a-z-]*:/i;
+// A space-separated `key=value` word, which ends the value of [tag=value key=value]
+const keyedWord = /\s+[^\s=]+=/g;
+const whitespaceFrom = /\s/g;
+const keyedWordNext = /\s+[^\s=\]]+=/y;
+const orderedListTypes = new Set(['1', 'a', 'A', 'i', 'I']);
+// The post details quote buttons add after the name: vBulletin `Name;123`, XenForo and Discourse `Name, post: 1, member: 2`
+const quoteDetails = /;n?\d+$|,\s*\w+:/;
+const wrappedInQuotes = /^(["'])(.*)\1$/s;
 
 // Attribute and tag names that would reach Object.prototype
 const dangerousKeys = new Set(['__proto__', 'constructor', 'prototype']);
@@ -216,76 +281,158 @@ function sanitizeUrl(url: string, allowedSchemes: string[]): string | undefined 
 	return trimmed;
 }
 
-// The tag name is everything before the first `=` in [tag=value], or before the first whitespace in [tag key=value flag]
-function tagName(content: string): string {
+// Where the tag name ends: at the first `=` in [tag=value], or at the first whitespace in [tag key=value flag]
+function nameEnd(content: string): number {
 	const firstEquals = content.indexOf('=');
 	const firstSpace = content.indexOf(' ');
 	if (firstSpace === -1 || (firstEquals !== -1 && firstEquals < firstSpace)) {
 		if (firstEquals === -1) {
-			return content.toLowerCase();
+			return content.length;
 		}
-		return content.slice(0, firstEquals).toLowerCase();
+		return firstEquals;
 	}
-	return content.slice(0, content.search(whitespace)).toLowerCase();
+	return content.search(whitespace);
+}
+
+function tagName(content: string): string {
+	return content.slice(0, nameEnd(content)).toLowerCase();
+}
+
+function whitespaceAt(content: string, from: number): number {
+	whitespaceFrom.lastIndex = from;
+	const match = whitespaceFrom.exec(content);
+	if (match === null) {
+		return content.length;
+	}
+	return match.index;
+}
+
+// Where the next space-separated `key=value` word starts, or -1
+function keyedWordAt(content: string, from: number): number {
+	// Most values have no other `=`, which settles it without running the regex
+	if (!content.includes('=', from)) {
+		return -1;
+	}
+	keyedWord.lastIndex = from;
+	const match = keyedWord.exec(content);
+	if (match === null) {
+		return -1;
+	}
+	return match.index;
+}
+
+/**
+ * Reads a value wrapped in matching quotes at `start`, returning its text and where it ends. Undefined when the
+ * value is not quoted, or its quote never closes, so it is read as unquoted text instead.
+ */
+function quotedValue(content: string, start: number, quotes: Quotes): [string, number] | undefined {
+	let mark = quotes.double;
+	if (!content.startsWith(mark, start)) {
+		mark = quotes.single;
+		if (!content.startsWith(mark, start)) {
+			return undefined;
+		}
+	}
+	const from = start + mark.length;
+	// A quote inside the value, as in "Bob "the Builder"", only closes it when whitespace or the end follows
+	let index = content.indexOf(mark, from);
+	while (index !== -1) {
+		const end = index + mark.length;
+		if (end === content.length || whitespace.test(content.charAt(end))) {
+			return [content.slice(from, index), end];
+		}
+		index = content.indexOf(mark, end);
+	}
+	return undefined;
+}
+
+// Adds each `key=value` and bare `flag` from `start` on to attrs, returning the first non-empty value
+function addAttributes(content: string, start: number, attrs: TagAttributes, quotes: Quotes): string {
+	let firstValue = '';
+	let index = start;
+	while (index < content.length) {
+		if (whitespace.test(content.charAt(index))) {
+			index++;
+			continue;
+		}
+		const wordEnd = whitespaceAt(content, index);
+		const equals = content.indexOf('=', index);
+		if (equals === -1 || equals > wordEnd) {
+			const flag = content.slice(index, wordEnd);
+			if (!dangerousKeys.has(flag.toLowerCase())) {
+				attrs[flag] = true;
+			}
+			index = wordEnd;
+			continue;
+		}
+		const key = content.slice(index, equals);
+		let value: string;
+		const quoted = quotedValue(content, equals + 1, quotes);
+		if (quoted === undefined) {
+			// SMF writes names unquoted, as in author=John Smith link=…, so bare words before another key=value join the value
+			let end = whitespaceAt(content, equals + 1);
+			const keyed = keyedWordAt(content, end);
+			if (keyed !== -1) {
+				end = keyed;
+			}
+			value = content.slice(equals + 1, end);
+			index = end;
+		} else {
+			[value, index] = quoted;
+		}
+		if (!dangerousKeys.has(key.toLowerCase())) {
+			attrs[key] = value;
+		}
+		if (!firstValue && value) {
+			firstValue = value;
+		}
+	}
+	return firstValue;
 }
 
 /**
  * Parse a tag's attributes from the text between its brackets
- * Supports both formats:
+ * Supports these formats, with any value optionally wrapped in "double" or 'single' quotes:
  * - [tag=value] → attr: 'value', attrs: {}
  * - [tag key=value flag] → attr: 'value', attrs: { key: 'value', flag: true }
+ * - [tag=value key=other flag] → attr: 'value', attrs: { key: 'other', flag: true }
  */
-function attributesOf(tag: OpenTag): TagAttributes {
+function attributesOf(tag: OpenTag, quotes: Quotes): TagAttributes {
 	if (tag.attrs !== undefined) {
 		return tag.attrs;
 	}
 	const content = tag.content;
-	const firstSpace = content.indexOf(' ');
-	const firstEquals = content.indexOf('=');
-
-	// Simple attribute format: [tag=value] or [tag] (no attributes)
-	if (firstSpace === -1 || (firstEquals !== -1 && firstEquals < firstSpace)) {
-		if (firstEquals !== -1) {
-			// Everything after first =
-			tag.attr = content.slice(firstEquals + 1);
+	const index = nameEnd(content);
+	// Where the named attributes start, after the name or the [tag=value] value
+	let rest = index;
+	let hasValue = false;
+	if (content.charAt(index) === '=') {
+		hasValue = true;
+		const quoted = quotedValue(content, index + 1, quotes);
+		if (quoted === undefined) {
+			// Unquoted, it may hold spaces as in [quote=Some user], so it only ends at a word that is itself key=value
+			rest = keyedWordAt(content, index + 1);
+			if (rest === -1) {
+				rest = content.length;
+			}
+			tag.attr = content.slice(index + 1, rest);
+		} else {
+			tag.attr = quoted[0];
+			rest = quoted[1];
 		}
+	}
+	// A plain object is much cheaper to create, and is safe here because no key from the input is ever written to it
+	if (rest === content.length) {
 		tag.attrs = {};
 		return tag.attrs;
 	}
-
-	// Space-separated attributes format: [tag attr1 key=value attr2]
-	const parts = content.split(/\s+/);
 	// Use Object.create(null) to prevent prototype pollution
-	const attrs: TagAttributes = Object.create(null) as TagAttributes;
-
-	for (let i = 1; i < parts.length; i++) {
-		const part = parts[i];
-		if (!part) {
-			continue;
-		}
-
-		const eqIndex = part.indexOf('=');
-		if (eqIndex === -1) {
-			// Boolean flag
-			if (!dangerousKeys.has(part.toLowerCase())) {
-				attrs[part] = true;
-			}
-			continue;
-		}
-
-		const key = part.slice(0, eqIndex);
-		if (dangerousKeys.has(key.toLowerCase())) {
-			continue;
-		}
-		const value = part.slice(eqIndex + 1);
-		attrs[key] = value;
-		// First key=value becomes the attr for backward compat
-		if (!tag.attr && value) {
-			tag.attr = value;
-		}
-	}
-
+	const attrs = Object.create(null) as TagAttributes;
 	tag.attrs = attrs;
+	const firstValue = addAttributes(content, rest, attrs, quotes);
+	if (!hasValue) {
+		tag.attr = firstValue;
+	}
 	return attrs;
 }
 
@@ -306,6 +453,132 @@ function indexOrEnd(input: string, character: string, from: number): number {
 		return Infinity;
 	}
 	return index;
+}
+
+// Where text ending at `end` stops once the newline that only put a block tag on its own line is dropped
+function endBeforeNewline(input: string, start: number, end: number): number {
+	if (end === start) {
+		return end;
+	}
+	const last = input.charAt(end - 1);
+	if (last === '\n' && end - 1 > start && input.charAt(end - 2) === '\r') {
+		return end - 2;
+	}
+	if (last === '\n' || last === '\r') {
+		return end - 1;
+	}
+	return end;
+}
+
+// Where text starting at `start` begins once the newline that follows a block tag is dropped
+function startAfterNewline(input: string, start: number): number {
+	const first = input.charAt(start);
+	if (first === '\r' && input.charAt(start + 1) === '\n') {
+		return start + 2;
+	}
+	if (first === '\n' || first === '\r') {
+		return start + 1;
+	}
+	return start;
+}
+
+function onlyNewlines(input: string, start: number, end: number): boolean {
+	for (let index = start; index < end; index++) {
+		const character = input.charAt(index);
+		if (character !== '\n' && character !== '\r') {
+			return false;
+		}
+	}
+	return true;
+}
+
+function quoteMark(text: string, opener: string): QuoteMark {
+	return { text, opener, next: -1, closeFrom: -1, close: -1, closeLimit: -1 };
+}
+
+// Most documents have no quoted values at all, so they skip looking for them in every tag
+function quoteScan(input: string, quotes: Quotes, from: number): QuoteScan | undefined {
+	if (!input.includes(quotes.doubleOpener, from) && !input.includes(quotes.singleOpener, from)) {
+		return undefined;
+	}
+	return {
+		double: quoteMark(quotes.double, quotes.doubleOpener),
+		single: quoteMark(quotes.single, quotes.singleOpener),
+		lineEnd: -1,
+	};
+}
+
+function nextOpener(input: string, mark: QuoteMark, from: number): number {
+	if (mark.next < from) {
+		mark.next = indexOrEnd(input, mark.opener, from);
+	}
+	return mark.next;
+}
+
+function lineEndFrom(input: string, scan: QuoteScan, from: number): number {
+	if (scan.lineEnd < from) {
+		scan.lineEnd = Math.min(indexOrEnd(input, '\n', from), indexOrEnd(input, '\r', from));
+	}
+	return scan.lineEnd;
+}
+
+/**
+ * The mark closing a value that opens just before `from`: the next one on its line that ends the tag or starts
+ * another key=value, which a stray quote in a typo like [quote="Bob]hi "there" rarely does.
+ */
+function closingMark(input: string, scan: QuoteScan, mark: QuoteMark, from: number): number {
+	// No valid closing mark lies between the last search's start and its answer, so the answer still holds from anywhere in between
+	if (mark.closeFrom <= from && from <= mark.closeLimit) {
+		return mark.close;
+	}
+	const limit = lineEndFrom(input, scan, from);
+	mark.closeFrom = from;
+	let index = input.indexOf(mark.text, from);
+	while (index !== -1 && index < limit) {
+		const after = index + mark.text.length;
+		keyedWordNext.lastIndex = after;
+		if (input.charAt(after) === ']' || keyedWordNext.test(input)) {
+			mark.close = index;
+			mark.closeLimit = index;
+			return index;
+		}
+		index = input.indexOf(mark.text, index + 1);
+	}
+	mark.close = Infinity;
+	mark.closeLimit = limit;
+	return Infinity;
+}
+
+// The `]` that ends a tag opened at `open`, which is past `close` when that one sits inside a quoted value like [quote="a]b"]
+function tagEnd(input: string, scan: QuoteScan, open: number, close: number): number {
+	let end = close;
+	let from = open + 1;
+	for (;;) {
+		let mark = scan.double;
+		let index = nextOpener(input, scan.double, from);
+		const single = nextOpener(input, scan.single, from);
+		if (single < index) {
+			mark = scan.single;
+			index = single;
+		}
+		if (index > end) {
+			return end;
+		}
+		from = index + mark.opener.length;
+		const closing = closingMark(input, scan, mark, from);
+		if (closing === Infinity) {
+			continue;
+		}
+		from = closing + mark.text.length;
+		if (closing < end) {
+			continue;
+		}
+		const next = input.indexOf(']', from);
+		if (next === -1) {
+			return close;
+		}
+		end = next;
+	}
 }
 
 // The text between two tags, with newlines converted when the config asks for it
@@ -392,7 +665,16 @@ function kindOf(kinds: Map<string, TagKind>, tags: TagsMap, content: string): Ta
 		if (Object.hasOwn(tags, name)) {
 			definition = tags[name];
 		}
-		kind = { name, definition, lastOpen: undefined };
+		kind = { name, definition, lastOpen: undefined, block: false, literal: false, raw: false };
+		if (definition?.type === 'ignore') {
+			kind.literal = true;
+		} else if (definition !== undefined) {
+			kind.block = definition.block === true;
+			if (definition.type === 'content' && definition.raw === true) {
+				kind.literal = true;
+				kind.raw = true;
+			}
+		}
 		kinds.set(name, kind);
 	}
 	return kind;
@@ -427,15 +709,26 @@ function buildTree(doc: Doc, tags: TagsMap): OpenTag | undefined {
 	// Opening tags no parent has claimed yet, in document order
 	const orphans: OpenTag[] = [];
 	let unclosed = 0;
-	// The ignore tag (e.g. noparse) whose contents are currently being skipped as plain text
+	// The ignore tag (e.g. noparse) or raw content tag whose contents are currently being skipped as plain text
 	let ignoring: TagKind | undefined;
+	// Only <br/> needs it: retained newlines are harmless and paragraph breaks still separate the text around a block
+	const trimBlocks = doc.lineBreak === LINE_BREAK;
+	// Whether the last tag was a block tag that dropped the newline after it
+	let afterBlock = false;
 	let textStart = 0;
-	let from = 0;
+	let from = input.indexOf('[');
+	// Searched from the first bracket on, so text without any never looks for quoted values
+	let scan: QuoteScan | undefined;
+	if (from === -1) {
+		from = input.length;
+	} else {
+		scan = quoteScan(input, doc.quotes, from);
+	}
 	// Cached positions of the next `]` and `^`, so input like `[[[[` is scanned once rather than once per bracket
 	let close = -1;
 	let caret = -1;
 
-	// A tag is `[`, one or more characters other than `]` and `^`, then `]`
+	// A tag is `[`, one or more characters other than `]` and `^`, then `]`, though a `]` inside a quoted value doesn't end it
 	for (;;) {
 		const open = input.indexOf('[', from);
 		if (open === -1) {
@@ -454,6 +747,13 @@ function buildTree(doc: Doc, tags: TagsMap): OpenTag | undefined {
 			// No bracket before the caret can start a tag either, as each would run into it too
 			from = caret + 1;
 			continue;
+		}
+		if (scan !== undefined) {
+			const end = tagEnd(input, scan, open, close);
+			// A caret inside the quoted value still rules the longer tag out, so the tag ends at its first `]` as before
+			if (end < caret) {
+				close = end;
+			}
 		}
 		from = close + 1;
 		if (close === open + 1) {
@@ -480,17 +780,43 @@ function buildTree(doc: Doc, tags: TagsMap): OpenTag | undefined {
 			}
 		}
 		const { content, kind } = spelling;
+		let raw = false;
 		if (ignoring !== undefined) {
 			if (kind !== ignoring) {
 				continue;
 			}
 			ignoring = undefined;
+			raw = kind.raw;
 		}
 
 		const slot = bounds.length / 2;
-		parts.push(textBetween(doc, textStart, open), undefined);
 		bounds.push(open, close + 1);
-		textStart = close + 1;
+		// Most tags leave the text around them alone, so they take the short way here
+		if (!raw && !(trimBlocks && kind.block)) {
+			parts.push(textBetween(doc, textStart, open), undefined);
+			textStart = close + 1;
+			afterBlock = false;
+		} else {
+			// A stray closing tag renders as nothing or as itself, so it keeps the newlines around it
+			const block = trimBlocks && kind.block && (!isClosing || kind.lastOpen !== undefined);
+			let textEnd = open;
+			// Between two block tags a run of newlines loses one, not two, so a blank line between them survives
+			if (block && !(afterBlock && onlyNewlines(input, textStart, open))) {
+				textEnd = endBeforeNewline(input, textStart, open);
+			}
+			if (raw) {
+				parts.push(input.slice(textStart, textEnd), undefined);
+			} else {
+				parts.push(textBetween(doc, textStart, textEnd), undefined);
+			}
+			textStart = close + 1;
+			afterBlock = false;
+			if (block) {
+				const next = startAfterNewline(input, textStart);
+				afterBlock = next !== textStart;
+				textStart = next;
+			}
+		}
 
 		if (isClosing) {
 			const opener = kind.lastOpen;
@@ -518,7 +844,7 @@ function buildTree(doc: Doc, tags: TagsMap): OpenTag | undefined {
 		kind.lastOpen = tag;
 		unclosed++;
 		orphans.push(tag);
-		if (kind.definition?.type === 'ignore') {
+		if (kind.literal) {
 			ignoring = kind;
 		}
 	}
@@ -554,13 +880,17 @@ function resolve(doc: Doc, slot: number, value: string): void {
 }
 
 // One piece of a replace tag's HTML, which its definition gives as a string or as a function of the tag's attributes
-function tagHtml(tag: OpenTag, html: ReplaceTag['close'] | undefined): string | null | undefined {
+function tagHtml(doc: Doc, tag: OpenTag, html: ReplaceTag['close'] | undefined): string | null | undefined {
 	if (typeof(html) !== 'function') {
 		return html;
 	}
 	// Parsing fills in tag.attr, so it has to happen before the call reads it
-	const attrs = attributesOf(tag);
-	return html(tag.attr, attrs);
+	const attrs = attributesOf(tag, doc.quotes);
+	let content = '';
+	if (tag.closeSlot !== -1) {
+		content = doc.input.slice(doc.bounds[(tag.slot * 2) + 1], doc.bounds[tag.closeSlot * 2]);
+	}
+	return html(tag.attr, attrs, content);
 }
 
 // Runs before a tag's children: the opening tag is replaced first so parents always resolve before what they contain
@@ -574,7 +904,7 @@ function enter(doc: Doc, tag: OpenTag): void {
 
 	const type: string = definition.type;
 	if (type === 'replace') {
-		const open = tagHtml(tag, (definition as ReplaceTag).open);
+		const open = tagHtml(doc, tag, (definition as ReplaceTag).open);
 		if (open) {
 			resolve(doc, tag.slot, open);
 		}
@@ -594,7 +924,7 @@ function enter(doc: Doc, tag: OpenTag): void {
 
 // Closes a tag that has no closing tag of its own, e.g. a [*] list item
 function autoClose(doc: Doc, tag: OpenTag, definition: ReplaceTag): void {
-	const html = tagHtml(tag, definition.autoClose);
+	const html = tagHtml(doc, tag, definition.autoClose);
 
 	// Close before the next sibling of the same tag (e.g. the next [*]), not before inline tags like [b] inside this item
 	let before: number | undefined;
@@ -690,7 +1020,7 @@ function replaceContent(doc: Doc, tag: OpenTag, definition: ContentTag): void {
 
 	let replace = definition.replace;
 	if (typeof(replace) === 'function') {
-		const attrs = attributesOf(tag);
+		const attrs = attributesOf(tag, doc.quotes);
 		replace = replace(tag.attr, inner, attrs);
 	}
 	doc.skips ??= new Map();
@@ -717,7 +1047,7 @@ function leave(doc: Doc, tag: OpenTag): void {
 		if (definition.autoClose && tag.closeSlot === -1) {
 			autoClose(doc, tag, definition);
 		}
-		const close = tagHtml(tag, definition.close);
+		const close = tagHtml(doc, tag, definition.close);
 		if (close && tag.closeSlot !== -1) {
 			resolve(doc, tag.closeSlot, close);
 		}
@@ -753,13 +1083,22 @@ class yabbcode {
 	tags: TagsMap = {
 		'url': {
 			type: 'replace',
-			open: attr => `<a href="${escapeHtml(sanitizeUrl(this.#unsanitize(attr), this.config.allowedSchemes ?? defaultAllowedSchemes) ?? '#')}">`,
+			open: (attr, _attrs, content) => {
+				let href: string | undefined;
+				if (attr) {
+					href = this.sanitizeUrl(attr);
+				} else {
+					href = this.#urlFromText(content);
+				}
+				return `<a href="${href ?? '#'}">`;
+			},
 			close: '</a>',
 		},
 		'quote': {
 			type: 'replace',
-			open: attr => `<blockquote author="${escapeHtml(this.#unsanitize(attr))}">`,
+			open: (attr, attrs) => `<blockquote author="${this.#quoteAuthor(attr, attrs)}">`,
 			close: '</blockquote>',
+			block: true,
 		},
 		'b': {
 			type: 'replace',
@@ -780,31 +1119,37 @@ class yabbcode {
 			type: 'replace',
 			open: '<h1>',
 			close: '</h1>',
+			block: true,
 		},
 		'h2': {
 			type: 'replace',
 			open: '<h2>',
 			close: '</h2>',
+			block: true,
 		},
 		'h3': {
 			type: 'replace',
 			open: '<h3>',
 			close: '</h3>',
+			block: true,
 		},
 		'h4': {
 			type: 'replace',
 			open: '<h4>',
 			close: '</h4>',
+			block: true,
 		},
 		'h5': {
 			type: 'replace',
 			open: '<h5>',
 			close: '</h5>',
+			block: true,
 		},
 		'h6': {
 			type: 'replace',
 			open: '<h6>',
 			close: '</h6>',
+			block: true,
 		},
 		'code': {
 			type: 'replace',
@@ -815,6 +1160,7 @@ class yabbcode {
 			type: 'replace',
 			open: '<hr/>',
 			close: null,
+			block: true,
 		},
 		'strike': {
 			type: 'replace',
@@ -828,19 +1174,33 @@ class yabbcode {
 		},
 		'list': {
 			type: 'replace',
-			open: '<ul>',
-			close: '</ul>',
+			// [list=1], [list=a] and the like number their items, as phpBB, MyBB and vBulletin do
+			open: (attr) => {
+				if (orderedListTypes.has(attr)) {
+					return `<ol type="${attr}">`;
+				}
+				return '<ul>';
+			},
+			close: (attr) => {
+				if (orderedListTypes.has(attr)) {
+					return '</ol>';
+				}
+				return '</ul>';
+			},
+			block: true,
 		},
 		'olist': {
 			type: 'replace',
 			open: '<ol>',
 			close: '</ol>',
+			block: true,
 		},
 		'*': {
 			type: 'replace',
 			open: '<li>',
 			close: '</li>',
 			autoClose: '</li>',
+			block: true,
 		},
 		'img': {
 			type: 'content',
@@ -850,12 +1210,11 @@ class yabbcode {
 				if (url.includes(PLACEHOLDER_START)) {
 					url = url.replaceAll(this.regex.placeholders, '');
 				}
-				url = this.#unsanitize(url);
-				const src = sanitizeUrl(url, this.config.allowedSchemes ?? defaultAllowedSchemes);
+				const src = this.sanitizeUrl(url);
 				if (src === undefined) {
 					return '';
 				}
-				return `<img src="${escapeHtml(src)}" alt="${escapeHtml(this.#unsanitize(attr))}"/>`;
+				return `<img src="${src}" alt="${this.escapeHtml(attr)}"/>`;
 			},
 		},
 		'noparse': {
@@ -894,12 +1253,35 @@ class yabbcode {
 		}
 	}
 
-	// Built-in attribute tags escape for themselves, so undo parse()'s sanitizing first to avoid double-escaping `&`.
-	#unsanitize(value: string): string {
-		if (!this.config.sanitizeHtml) {
-			return value;
+	// Forum exports put post details beside the name, which readers don't need: SMF also names it as an author= attribute
+	#quoteAuthor(attr: string, attrs: TagAttributes): string {
+		let author = attr;
+		if (typeof(attrs.author) === 'string') {
+			author = attrs.author;
 		}
-		return unescapeSanitized(value);
+		author = this.unescapeHtml(author);
+		// Plain names skip the regexes, which every quote would otherwise pay for
+		if (author.includes(';') || author.includes(',')) {
+			const details = author.search(quoteDetails);
+			if (details !== -1) {
+				author = author.slice(0, details);
+			}
+			// vBulletin can quote the name before its post id, as in "King Of Kings";172380, so those quotes survive parsing
+			const quoted = wrappedInQuotes.exec(author);
+			if (quoted !== null) {
+				author = quoted[2] ?? '';
+			}
+		}
+		return escapeHtml(author);
+	}
+
+	// [url]https://example.com[/url] links to its own text, but only when that text is an absolute URL rather than a label
+	#urlFromText(text: string): string | undefined {
+		const url = normalizeUrl(this.unescapeHtml(text));
+		if (!absoluteUrl.test(url) || whitespace.test(url)) {
+			return undefined;
+		}
+		return this.sanitizeUrl(text);
 	}
 
 	// What an unresolved slot becomes: nothing, or the original tag, escaped because it can land inside an attribute
@@ -909,6 +1291,37 @@ class yabbcode {
 		}
 		// With sanitizeHtml off the input was never escaped, so the tag is escaped here instead
 		return tagText(doc, slot, !this.config.sanitizeHtml);
+	}
+
+	/**
+	 * Gives back the original text of an attribute or content that parse() HTML-escaped before handing it to a tag
+	 * function. Returns the value unchanged when sanitizeHtml is off, since nothing was escaped.
+	 */
+	unescapeHtml(value: string): string {
+		if (!this.config.sanitizeHtml) {
+			return value;
+		}
+		return unescapeSanitized(value);
+	}
+
+	/**
+	 * Escapes text for HTML content or a quoted attribute value. Safe to call on values parse() hands to tag
+	 * functions, which are already escaped when sanitizeHtml is on: they are not escaped twice.
+	 */
+	escapeHtml(value: string): string {
+		return escapeHtml(this.unescapeHtml(value));
+	}
+
+	/**
+	 * Makes a URL safe for an href or src attribute: returns it escaped, or undefined when it is empty or its scheme
+	 * is not in allowedSchemes. Like escapeHtml(), it accepts values parse() hands to tag functions as they are.
+	 */
+	sanitizeUrl(url: string): string | undefined {
+		const safe = sanitizeUrl(this.unescapeHtml(url), this.config.allowedSchemes ?? defaultAllowedSchemes);
+		if (safe === undefined) {
+			return undefined;
+		}
+		return escapeHtml(safe);
 	}
 
 	clearTags(): this {
@@ -939,19 +1352,22 @@ class yabbcode {
 		if (input.includes(PLACEHOLDER_START)) {
 			input = input.replaceAll(PLACEHOLDER_START, '');
 		}
+		let quotes = rawQuotes;
 		if (this.config.sanitizeHtml) {
 			input = escapeHtml(input);
+			quotes = escapedQuotes;
 		}
 
 		let lineBreak: string | undefined;
 		if (this.config.newline) {
-			lineBreak = '<br/>';
+			lineBreak = LINE_BREAK;
 			if (this.config.paragraph) {
 				lineBreak = PARAGRAPH_BREAK;
 			}
 		}
 		const doc: Doc = {
 			input,
+			quotes,
 			lineBreak,
 			parts: [],
 			bounds: [],

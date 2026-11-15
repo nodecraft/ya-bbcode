@@ -19,7 +19,7 @@ const allowedAttributes: Record<string, string[]> = {
 	hr: [],
 	span: ['class'],
 	ul: [],
-	ol: [],
+	ol: ['type'],
 	li: [],
 	img: ['src', 'alt'],
 	br: [],

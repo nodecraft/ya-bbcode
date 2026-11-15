@@ -21,8 +21,10 @@ parser.parse(bbc);
 ```javascript
 parser.registerTag('url', {
 	type: 'replace',
-	open: (attr) => {
-		return `<a href="${attr || '#'}" rel="noopener norefer">`;
+	// content is the text between the tags as written, so [url]https://nodecraft.com[/url] works too
+	open: (attr, attrs, content) => {
+		const href = parser.sanitizeUrl(attr || content) ?? '#';
+		return `<a href="${href}" rel="noopener noreferrer">`;
 	},
 	close: '</a>'
 });
@@ -30,6 +32,40 @@ parser.registerTag('url', {
 // Remove all default or registered tags
 parser.clearTags();
 ```
+
+There are three kinds of tag:
+
+| Type | Options | Renders as |
+| --- | --- | --- |
+| `replace` | `open`, `close`, `autoClose`, `block` | `open` and `close` swapped in for the opening and closing tag, with the BBCode between them parsed as usual. `autoClose` closes a tag that has no closing tag of its own, like `[*]`. |
+| `content` | `replace`, `raw`, `block` | Whatever `replace(attr, content, attrs)` returns, in place of the whole tag and its content. `content` is the inner BBCode already rendered to HTML, or with `raw: true` the inner text as written: BBCode and newlines untouched, so it suits code blocks. |
+| `ignore` | | The content as plain text, like `[noparse]`. |
+
+`block: true` marks a tag that renders as a block element, such as a heading, list or quote. The newline on each side of its opening and closing tags is dropped instead of becoming a stray `<br/>`, so `[list]\n[*]one\n[/list]` renders as `<ul><li>one</li></ul>`. It applies when `newline` is on and `paragraph` is off.
+
+##### Attributes
+
+Tag functions receive `attr`, the tag's main value, and `attrs`, its named attributes:
+
+| BBCode | `attr` | `attrs` |
+| --- | --- | --- |
+| `[quote=Some user]` | `'Some user'` | `{}` |
+| `[code lang=js skip-lint]` | `'js'` | `{ lang: 'js', 'skip-lint': true }` |
+| `[quote=Some user post=12]` | `'Some user'` | `{ post: '12' }` |
+| `[quote="Bob said x=5" post_id=1]` | `'Bob said x=5'` | `{ post_id: '1' }` |
+| `[quote author=John Smith link=msg=12]` | `'John Smith'` | `{ author: 'John Smith', link: 'msg=12' }` |
+
+Any value can be wrapped in `"double"` or `'single'` quotes, which are removed, and a quoted value may contain spaces, `=` and `]`. An unquoted value runs until the next word that is itself `key=value`, so words between two named attributes join the first one's value. Flags before or after them stay flags.
+
+The built-in tags understand what popular forums export: `[quote]` shows just the author's name from phpBB, XenForo, Discourse, vBulletin, SMF and MyBB quotes, and `[list=1]`, `[list=a]`, `[list=A]`, `[list=i]` and `[list=I]` render numbered lists.
+
+##### Escaping in custom tags
+
+With `sanitizeHtml` on (the default), everything a tag function receives is already HTML-escaped, so it can go straight into HTML content. To use it anywhere else, use the parser's helpers. They work the same with `sanitizeHtml` on or off and never escape twice:
+
+- `parser.sanitizeUrl(value)`: an escaped URL for `href` or `src`, or `undefined` when its scheme isn't in `allowedSchemes` (blocking `javascript:` and similar).
+- `parser.escapeHtml(value)`: escaped text for HTML or a quoted attribute.
+- `parser.unescapeHtml(value)`: the original text, for handing to something that escapes for itself, like a syntax highlighter.
 
 ### Why ya-bbcode?
  - **Supports nested BBCode**: Properly handles complex nested structures

@@ -130,8 +130,9 @@ interface Rendered {
 	html: string;
 }
 
+// Rendered with newlines kept, since block tags dropping newlines next to them is covered by the unit tests
 const plainText = fc.constantFrom('', 'a', 'some text', ' ', '\n', 'x\ny').map((value): Rendered => {
-	return { bbcode: value, html: value.replaceAll('\n', '<br/>') };
+	return { bbcode: value, html: value };
 });
 
 // Properly nested documents, paired with the HTML they must become
@@ -176,7 +177,7 @@ describe('fuzz: parse', () => {
 	it('renders every tag of a properly nested document', () => {
 		fc.assert(
 			fc.property(nestedDocument, ({ bbcode: source, html }) => {
-				expect(new yabbc().parse(source)).toBe(html);
+				expect(new yabbc({ newline: false }).parse(source)).toBe(html);
 			}),
 			fuzzParams,
 		);
