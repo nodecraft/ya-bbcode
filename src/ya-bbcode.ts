@@ -92,7 +92,6 @@ interface OpenTag {
 	attrs: TagAttributes | undefined; // Parsed attributes
 }
 
-// One parse() call's working state, kept off the instance so a tag function can safely call parse() again
 // How quote marks around attribute values appear in the input, which parse() may already have HTML-escaped
 interface Quotes {
 	double: string;
@@ -124,6 +123,7 @@ interface QuoteScan {
 	lineEnd: number;
 }
 
+// One parse() call's working state, kept off the instance so a tag function can safely call parse() again
 interface Doc {
 	input: string;
 	quotes: Quotes;
@@ -590,7 +590,8 @@ function tagEnd(input: string, scan: QuoteScan, open: number, close: number): nu
 		if (index > end) {
 			return end;
 		}
-		from = index + mark.opener.length;
+		const valueStart = index + mark.opener.length;
+		from = valueStart;
 		const closing = closingMark(input, scan, mark, from);
 		if (closing === Infinity) {
 			continue;
@@ -598,6 +599,10 @@ function tagEnd(input: string, scan: QuoteScan, open: number, close: number): nu
 		from = closing + mark.text.length;
 		if (closing < end) {
 			continue;
+		}
+		// A quote before this `]` already ended the value, if untidily as in [quote="Bob" ] or [quote="Bob";12], so the `]` ends the tag
+		if (input.lastIndexOf(mark.text, end - 1) >= valueStart) {
+			return end;
 		}
 		const next = input.indexOf(']', from);
 		if (next === -1) {
@@ -774,7 +779,8 @@ function buildTree(doc: Doc, tags: TagsMap): OpenTag | undefined {
 			from = caret + 1;
 			continue;
 		}
-		if (scan !== undefined) {
+		// Inside an ignore or raw tag a quote is plain text, so it must not stretch a tag over the closing one
+		if (scan !== undefined && ignoring === undefined) {
 			const end = tagEnd(input, scan, open, close);
 			// A caret inside the quoted value still rules the longer tag out, so the tag ends at its first `]` as before
 			if (end < caret) {
@@ -1303,6 +1309,10 @@ class yabbcode {
 
 	// [url]https://example.com[/url] links to its own text, but only when that text is an absolute URL rather than a label
 	#urlFromText(text: string): string | undefined {
+		// Text holding tags is not a URL, and stopping at the first `[` keeps nested [url] tags from each reading all they contain
+		if (text.includes('[')) {
+			return undefined;
+		}
 		const url = normalizeUrl(this.unescapeHtml(text));
 		if (!absoluteUrl.test(url) || whitespace.test(url)) {
 			return undefined;
@@ -1332,7 +1342,8 @@ class yabbcode {
 
 	/**
 	 * Escapes text for HTML content or a quoted attribute value. Safe to call on values parse() hands to tag
-	 * functions, which are already escaped when sanitizeHtml is on: they are not escaped twice.
+	 * functions, which are already escaped when sanitizeHtml is on: they are not escaped twice. That means with
+	 * sanitizeHtml on, entities in any value are decoded first, so `&amp;` renders as `&` rather than as written.
 	 */
 	escapeHtml(value: string): string {
 		return escapeHtml(this.unescapeHtml(value));
@@ -1430,7 +1441,7 @@ class yabbcode {
 }
 
 // Export types for users
-export type { Config, TagAttributes, ReplaceTag, ContentTag, IgnoreTag, TagDefinition };
+export type { Config, TagAttributes, ReplaceHtml, ReplaceTag, ContentTag, IgnoreTag, TagDefinition };
 
 // Default export for both CJS and ESM
 export default yabbcode;

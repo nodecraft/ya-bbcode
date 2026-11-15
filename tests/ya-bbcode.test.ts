@@ -181,6 +181,11 @@ describe('ya-bbcode', () => {
 		// A tag inside noparse can contain the closing tag's text, which must not be mistaken for the real close
 		expect(parser.parse('[noparse][a[/noparse] [/noparse]')).toBe('[a[/noparse] ');
 	});
+	it('Tag: noparse closes even when a quoted value inside it never does', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[noparse][url="x][/noparse] [b]bold[/b] "]')).toBe('[url=&quot;x] <strong>bold</strong> &quot;]');
+		expect(new yabbc({ sanitizeHtml: false }).parse('[noparse][quote=\'a][/noparse][i]b[/i]\']')).toBe('[quote=\'a]<i>b</i>\']');
+	});
 	it('Custom Tag, all functions', () => {
 		const parser = new yabbc();
 		parser.registerTag('url', {
@@ -913,6 +918,10 @@ describe('Raw content tags', () => {
 	it('are not escaped when sanitizeHtml is off', () => {
 		expect(withCodeblock({ sanitizeHtml: false }).parse('[codeblock]<i>[i]x[/i]</i>[/codeblock]')).toBe('<pre><i>[i]x[/i]</i></pre>');
 	});
+
+	it('still close when a quoted value inside them would run past the closing tag', () => {
+		expect(withCodeblock().parse('[codeblock][url="x][/codeblock] [b]b[/b] "]')).toBe('<pre>[url=&quot;x]</pre> <strong>b</strong> &quot;]');
+	});
 });
 
 describe('[url] without an attribute', () => {
@@ -928,6 +937,7 @@ describe('[url] without an attribute', () => {
 		expect(parser.parse('[url]javascript:alert(1)[/url]')).toBe('<a href="#">javascript:alert(1)</a>');
 		expect(parser.parse('[url]java\tscript:alert(1)[/url]')).toBe('<a href="#">java\tscript:alert(1)</a>');
 		expect(parser.parse('[url][b]https://example.com[/b][/url]')).toBe('<a href="#"><strong>https://example.com</strong></a>');
+		expect(parser.parse('[url]https://example.com/[b]x[/b][/url]')).toBe('<a href="#">https://example.com/<strong>x</strong></a>');
 		expect(new yabbc({ allowedSchemes: ['https'] }).parse('[url]http://example.com[/url]')).toBe('<a href="#">http://example.com</a>');
 	});
 
@@ -1016,6 +1026,15 @@ describe('Quoted attribute values', () => {
 		expect(parser.parse('[quote="Bob]hi\n"]x[/quote]')).toBe('<blockquote author="&quot;Bob">hi<br/>&quot;]x</blockquote>');
 	});
 
+	// The quote closing the value comes before the first ], so a later "] on the line must not stretch the tag to it
+	it('end the tag at its first ] when the value closed before it without a clean break', () => {
+		for (const sanitizeHtml of [true, false]) {
+			const parser = new yabbc({ sanitizeHtml });
+			expect(parser.parse('[quote="Bob" ]He said [b]hi[/b] then [url="https://example.com"]y[/url][/quote]')).toBe('<blockquote author="Bob">He said <strong>hi</strong> then <a href="https://example.com">y</a></blockquote>');
+			expect(capture('[item="Bob" pinned]x [url=\'https://example.com\']y[/url]', { sanitizeHtml })).toEqual(['Bob', { pinned: true }]);
+		}
+	});
+
 	it('let bare words between two key=value words join the first value, as SMF writes names', () => {
 		expect(capture('[item author=John Smith link=msg=12 date=3]')).toEqual(['John Smith', { author: 'John Smith', link: 'msg=12', date: '3' }]);
 		expect(capture('[item lang=js skip-lint]')).toEqual(['js', { 'lang': 'js', 'skip-lint': true }]);
@@ -1036,6 +1055,13 @@ describe('Forum quote formats', () => {
 		['MyBB', '[quote=\'Name\' pid=\'12\' dateline=\'1700000000\']', 'Name'],
 	])('shows just the name for %s', (_engine, tag, author) => {
 		expect(new yabbc().parse(`${tag}hi[/quote]`)).toBe(`<blockquote author="${author}">hi</blockquote>`);
+	});
+
+	it.each([
+		['vBulletin, quoted name', '[QUOTE="King Of Kings";172380]', 'King Of Kings'],
+		['XenForo', '[QUOTE="bjf, post: 9611, member: 135"]', 'bjf'],
+	])('keeps the rest of the line for %s when a quoted value follows', (_engine, tag, author) => {
+		expect(new yabbc().parse(`${tag}hi[/quote] see [url="https://example.com"]this[/url]`)).toBe(`<blockquote author="${author}">hi</blockquote> see <a href="https://example.com">this</a>`);
 	});
 });
 
@@ -1097,6 +1123,9 @@ describe('Linear time', () => {
 		['apostrophes between tags', '[b]it\'s[/b] [i=\'x]'.repeat(50000)],
 		['a long run of spaces before an =', `[quote=b${' '.repeat(200000)}=]x[/quote]`],
 		['a long run of spaces after a quoted value', `[quote="a]"${' '.repeat(200000)}b]x[/quote]`],
+		['nested url tags linking to their text', `${'[url]'.repeat(50000)}&x${'[/url]'.repeat(50000)}`],
+		['nested url tags that each start like a URL', `${'[url]a:'.repeat(50000)}${'[/url]'.repeat(50000)}`],
+		['quoted values closed before a ] with a "] later on the line', '[quote="a" ]x [b="y"]z'.repeat(50000)],
 	];
 
 	it.each(inputs)('parses %s without slowing down as they grow', (_name, input) => {

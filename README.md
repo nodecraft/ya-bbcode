@@ -21,9 +21,8 @@ parser.parse(bbc);
 ```javascript
 parser.registerTag('url', {
 	type: 'replace',
-	// content is the text between the tags as written, so [url]https://nodecraft.com[/url] works too
-	open: (attr, attrs, content) => {
-		const href = parser.sanitizeUrl(attr || content) ?? '#';
+	open: (attr) => {
+		const href = parser.sanitizeUrl(attr) ?? '#';
 		return `<a href="${href}" rel="noopener noreferrer">`;
 	},
 	close: '</a>'
@@ -37,7 +36,7 @@ There are three kinds of tag:
 
 | Type | Options | Renders as |
 | --- | --- | --- |
-| `replace` | `open`, `close`, `autoClose`, `block` | `open` and `close` swapped in for the opening and closing tag, with the BBCode between them parsed as usual. `autoClose` closes a tag that has no closing tag of its own, like `[*]`. |
+| `replace` | `open`, `close`, `autoClose`, `block` | `open` and `close` swapped in for the opening and closing tag, with the BBCode between them parsed as usual. `autoClose` closes a tag that has no closing tag of its own, like `[*]`. Each can be a function of `(attr, attrs, content)`, where `content` is the text between the tags as written, inner BBCode included. |
 | `content` | `replace`, `raw`, `block` | Whatever `replace(attr, content, attrs)` returns, in place of the whole tag and its content. `content` is the inner BBCode already rendered to HTML, or with `raw: true` the inner text as written: BBCode and newlines untouched, so it suits code blocks. |
 | `ignore` | | The content as plain text, like `[noparse]`. |
 
