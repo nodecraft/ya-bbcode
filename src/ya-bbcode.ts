@@ -459,12 +459,11 @@ class yabbcode {
 					content = content.replace('[TAG-' + tag.closing.index + ']', close);
 				}
 			} else if (module.type === 'content') {
-				content = this.contentModules.content(tag, module as ContentTag, content);
-				// Recurse children so nested tags inside content that re-emits its
-				// inner content (e.g. a custom [box] wrapper) are still resolved.
+				// Resolve children first so replace() receives final HTML it can escape, rather than placeholders that expand into raw HTML after escaping
 				if (tag.children.length > 0) {
-					content = this.#contentLoop(tag.children, content);
+					content = this.#contentLoop(tag.children, content, tag.closing?.index);
 				}
+				content = this.contentModules.content(tag, module as ContentTag, content);
 			} else if (module.type === 'ignore') {
 				content = this.contentModules.ignore(tag, module as IgnoreTag, content);
 			}
