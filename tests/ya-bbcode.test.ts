@@ -181,6 +181,11 @@ describe('ya-bbcode', () => {
 		// A tag inside noparse can contain the closing tag's text, which must not be mistaken for the real close
 		expect(parser.parse('[noparse][a[/noparse] [/noparse]')).toBe('[a[/noparse] ');
 	});
+	it('Tag: noparse closes even when a quoted value inside it never does', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[noparse][url="x][/noparse] [b]bold[/b] "]')).toBe('[url=&quot;x] <strong>bold</strong> &quot;]');
+		expect(new yabbc({ sanitizeHtml: false }).parse('[noparse][quote=\'a][/noparse][i]b[/i]\']')).toBe('[quote=\'a]<i>b</i>\']');
+	});
 	it('Custom Tag, all functions', () => {
 		const parser = new yabbc();
 		parser.registerTag('url', {
@@ -247,7 +252,8 @@ describe('ya-bbcode', () => {
 	});
 	it('New line: converted', () => {
 		const parser = new yabbc({ newline: true });
-		expect(parser.parse(bbcodes.newline)).toBe('<h1>Nodecraft</h1><br/><strong>Game Servers Done Right</strong>');
+		expect(parser.parse(bbcodes.newline)).toBe('<h1>Nodecraft</h1><strong>Game Servers Done Right</strong>');
+		expect(parser.parse(bbcodes.newline_notag)).toBe('Nodecraft<br/>Game Servers Done Right');
 	});
 	it('New line: retained', () => {
 		const parser = new yabbc({ newline: false });
@@ -526,7 +532,7 @@ describe('Security Tests', () => {
 
 	it('XSS Prevention: nested tags cannot break out of img src', () => {
 		const parser = new yabbc();
-		expect(parser.parse('[img][quote=x onerror=alert(1)]y[/quote][/img]')).toBe('<img src="&lt;blockquote author=&quot;x onerror=alert(1)&quot;&gt;y&lt;/blockquote&gt;" alt=""/>');
+		expect(parser.parse('[img][quote=x" onerror="alert(1)]y[/quote][/img]')).toBe('<img src="&lt;blockquote author=&quot;x&quot;&quot;&gt;y&lt;/blockquote&gt;" alt=""/>');
 		expect(parser.parse('[img]http://x/[b]a[/b].png[/img]')).toBe('<img src="http://x/&lt;strong&gt;a&lt;/strong&gt;.png" alt=""/>');
 	});
 
@@ -646,14 +652,16 @@ describe('Placeholder handling', () => {
 	it('still escapes attribute breakouts with sanitizeHtml on and off', () => {
 		for (const sanitizeHtml of [true, false]) {
 			const parser = new yabbc({ sanitizeHtml });
-			expect(parser.parse('[quote=a" onmouseover="x]hi[/quote]')).toBe('<blockquote author="a&quot; onmouseover=&quot;x">hi</blockquote>');
+			expect(parser.parse('[quote=a"onmouseover="x]hi[/quote]')).toBe('<blockquote author="a&quot;onmouseover=&quot;x">hi</blockquote>');
+			// A space-separated `key=` word becomes an attribute, so the breakout attempt never reaches the HTML at all
+			expect(parser.parse('[quote=a" onmouseover="x]hi[/quote]')).toBe('<blockquote author="a&quot;">hi</blockquote>');
 			expect(parser.parse('[img]a" onerror="x[/img]')).toBe('<img src="a&quot; onerror=&quot;x" alt=""/>');
 		}
 	});
 
 	it('does not expand $ replacement patterns from attributes', () => {
 		const parser = new yabbc();
-		expect(parser.parse('[url=x onmouseover=alert(1)]z[/url][quote=$`]a[/quote]')).toBe('<a href="x onmouseover=alert(1)">z</a><blockquote author="$`">a</blockquote>');
+		expect(parser.parse('[url=x]z[/url][quote=$`]a[/quote]')).toBe('<a href="x">z</a><blockquote author="$`">a</blockquote>');
 		expect(parser.parse('[quote=$&]a[/quote]')).toBe('<blockquote author="$&amp;">a</blockquote>');
 
 		const rawParser = new yabbc({ sanitizeHtml: false });
@@ -840,6 +848,253 @@ describe('Mis-nested content tags', () => {
 	});
 });
 
+describe('Block tags', () => {
+	it('drop the newline on each side of their tags instead of leaving stray line breaks', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[list]\n[*]one\n[*]two\n[/list]\nafter')).toBe('<ul><li>one</li><li>two</li></ul>after');
+		expect(parser.parse('before\r\n[quote=Bob]\r\nhi\r\n[/quote]\r\nafter')).toBe('before<blockquote author="Bob">hi</blockquote>after');
+		expect(parser.parse('a\n[hr]\nb')).toBe('a<hr/>b');
+	});
+
+	it('only drop one newline, so blank lines the author wrote survive', () => {
+		const parser = new yabbc();
+		expect(parser.parse('a\n\n[quote]q[/quote]\n\nb')).toBe('a<br/><blockquote author="">q</blockquote><br/>b');
+		expect(parser.parse('[quote]a[/quote]\n[quote]b[/quote]')).toBe('<blockquote author="">a</blockquote><blockquote author="">b</blockquote>');
+		expect(parser.parse('[quote]a[/quote]\n\n[quote]b[/quote]')).toBe('<blockquote author="">a</blockquote><br/><blockquote author="">b</blockquote>');
+	});
+
+	it('leave newlines alone around inline tags, stray closing tags and when newlines are not converted', () => {
+		expect(new yabbc().parse('a\n[b]x[/b]\nb')).toBe('a<br/><strong>x</strong><br/>b');
+		expect(new yabbc().parse('a\n[/quote]\nb')).toBe('a<br/><br/>b');
+		expect(new yabbc({ newline: false }).parse('a\n[h1]x[/h1]\nb')).toBe('a\n<h1>x</h1>\nb');
+		expect(new yabbc({ paragraph: true }).parse('a\n[h1]x[/h1]\nb')).toBe('<p>a</p><p><h1>x</h1></p><p>b</p>');
+	});
+
+	it('can be declared on custom replace and content tags', () => {
+		const parser = new yabbc();
+		parser.registerTag('center', { type: 'replace', open: '<div>', close: '</div>', block: true });
+		parser.registerTag('box', { type: 'content', replace: (_attr, content) => `<aside>${content}</aside>`, block: true });
+		expect(parser.parse('a\n[center]\nx\n[/center]\n[box]\ny\n[/box]\nb')).toBe('a<div>x</div><aside>y</aside>b');
+	});
+});
+
+describe('Raw content tags', () => {
+	function withCodeblock(config = {}) {
+		const parser = new yabbc(config);
+		parser.registerTag('codeblock', {
+			type: 'content',
+			raw: true,
+			block: true,
+			replace: (_attr, content) => `<pre>${content}</pre>`,
+		});
+		return parser;
+	}
+
+	it('receive their content as written, with BBCode and newlines untouched but still escaped', () => {
+		const parser = withCodeblock();
+		expect(parser.parse('[codeblock]\nif a < b:\n\tprint("[b]x[/b]")\n[/codeblock]')).toBe('<pre>if a &lt; b:\n\tprint(&quot;[b]x[/b]&quot;)</pre>');
+	});
+
+	it('keep tags inside from pairing with tags outside', () => {
+		const parser = withCodeblock();
+		expect(parser.parse('[b]a[codeblock][/b][/codeblock]b[/b]')).toBe('<strong>a<pre>[/b]</pre>b</strong>');
+	});
+
+	it('hand the original text back through unescapeHtml', () => {
+		let seen = '';
+		const parser = new yabbc();
+		parser.registerTag('code', {
+			type: 'content',
+			raw: true,
+			replace: (_attr, content) => {
+				seen = parser.unescapeHtml(content);
+				return '';
+			},
+		});
+		parser.parse('[code]a < b && "c"[/code]');
+		expect(seen).toBe('a < b && "c"');
+	});
+
+	it('are not escaped when sanitizeHtml is off', () => {
+		expect(withCodeblock({ sanitizeHtml: false }).parse('[codeblock]<i>[i]x[/i]</i>[/codeblock]')).toBe('<pre><i>[i]x[/i]</i></pre>');
+	});
+
+	it('still close when a quoted value inside them would run past the closing tag', () => {
+		expect(withCodeblock().parse('[codeblock][url="x][/codeblock] [b]b[/b] "]')).toBe('<pre>[url=&quot;x]</pre> <strong>b</strong> &quot;]');
+	});
+});
+
+describe('[url] without an attribute', () => {
+	it('links to its text when that text is an absolute URL with an allowed scheme', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[url]https://example.com/?a=1&b=2[/url]')).toBe('<a href="https://example.com/?a=1&amp;b=2">https://example.com/?a=1&amp;b=2</a>');
+		expect(parser.parse('[url] mailto:a@example.com [/url]')).toBe('<a href="mailto:a@example.com"> mailto:a@example.com </a>');
+	});
+
+	it('falls back to # for labels, disallowed schemes and nested tags', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[url]Visit Nodecraft[/url]')).toBe('<a href="#">Visit Nodecraft</a>');
+		expect(parser.parse('[url]javascript:alert(1)[/url]')).toBe('<a href="#">javascript:alert(1)</a>');
+		expect(parser.parse('[url]java\tscript:alert(1)[/url]')).toBe('<a href="#">java\tscript:alert(1)</a>');
+		expect(parser.parse('[url][b]https://example.com[/b][/url]')).toBe('<a href="#"><strong>https://example.com</strong></a>');
+		expect(parser.parse('[url]https://example.com/[b]x[/b][/url]')).toBe('<a href="#">https://example.com/<strong>x</strong></a>');
+		expect(new yabbc({ allowedSchemes: ['https'] }).parse('[url]http://example.com[/url]')).toBe('<a href="#">http://example.com</a>');
+	});
+
+	it('passes the text between the tags to custom replace tags', () => {
+		const parser = new yabbc();
+		parser.registerTag('email', {
+			type: 'replace',
+			open: (attr, _attrs, content) => `<a href="mailto:${parser.escapeHtml(attr || content)}">`,
+			close: '</a>',
+		});
+		expect(parser.parse('[email]a@example.com[/email] [email=b@example.com]me[/email]')).toBe('<a href="mailto:a@example.com">a@example.com</a> <a href="mailto:b@example.com">me</a>');
+	});
+});
+
+describe('Mixed [tag=value key=value] attributes', () => {
+	function capture(input: string) {
+		let seen: [string, Record<string, string | boolean>] = ['', {}];
+		const parser = new yabbc();
+		parser.registerTag('item', {
+			type: 'replace',
+			open: (attr, attrs) => {
+				seen = [attr, { ...attrs }];
+				return '';
+			},
+			close: null,
+		});
+		parser.parse(input);
+		return seen;
+	}
+
+	it('splits the value from the key=value words and flags after it', () => {
+		expect(capture('[item=123 domain=ptr]')).toEqual(['123', { domain: 'ptr' }]);
+		expect(capture('[item=John Smith post=12 pinned]')).toEqual(['John Smith', { post: '12', pinned: true }]);
+	});
+
+	it('keeps spaces and = inside a value that has no key=value words after it', () => {
+		expect(capture('[item=Some user]')).toEqual(['Some user', {}]);
+		expect(capture('[item=https://example.com/?a=1]')).toEqual(['https://example.com/?a=1', {}]);
+	});
+
+	it('still drops prototype-shaped keys', () => {
+		expect(Object.keys(capture('[item=1 __proto__=x constructor=y ok=z]')[1])).toEqual(['ok']);
+	});
+});
+
+describe('Quoted attribute values', () => {
+	function capture(input: string, config = {}) {
+		let seen: [string, Record<string, string | boolean>] = ['', {}];
+		const parser = new yabbc(config);
+		parser.registerTag('item', {
+			type: 'replace',
+			open: (attr, attrs) => {
+				seen = [attr, { ...attrs }];
+				return '';
+			},
+			close: null,
+		});
+		parser.parse(input);
+		return seen;
+	}
+
+	it('come without their quotes, with sanitizeHtml on and off', () => {
+		for (const sanitizeHtml of [true, false]) {
+			const parser = new yabbc({ sanitizeHtml });
+			expect(parser.parse('[URL="https://example.com/a"]x[/URL] [url=\'https://example.com/b\']y[/url]')).toBe('<a href="https://example.com/a">x</a> <a href="https://example.com/b">y</a>');
+			expect(parser.parse('[url="javascript:alert(1)"]x[/url]')).toBe('<a href="#">x</a>');
+		}
+	});
+
+	it('keep spaces, = and the other kind of quote inside them', () => {
+		expect(capture('[item="Bob said x=5" post=12]')).toEqual(['Bob said x=5', { post: '12' }]);
+		expect(capture('[item=\'Name\' pid=\'12\' alt="it\'s"]')).toEqual(['Name', { pid: '12', alt: 'it&#39;s' }]);
+		expect(capture('[item=Bob\'s mum]')).toEqual(['Bob&#39;s mum', {}]);
+	});
+
+	it('can hold ], since forum names like [Lusk]-Lynge do', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[quote="[Lusk]-Lynge"]a[/quote] [quote=\'Na]me\']b[/quote]')).toBe('<blockquote author="[Lusk]-Lynge">a</blockquote> <blockquote author="Na]me">b</blockquote>');
+		expect(capture('[item="a]b" post_id=1]')).toEqual(['a]b', { post_id: '1' }]);
+		expect(capture('[item="a]b" post_id=1]', { sanitizeHtml: false })).toEqual(['a]b', { post_id: '1' }]);
+	});
+
+	it('end the tag at its first ] when the quote never properly closes', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[quote="Bob]hi "there" friend[/quote] after')).toBe('<blockquote author="&quot;Bob">hi &quot;there&quot; friend</blockquote> after');
+		expect(parser.parse('[quote="Bob]hi\n"]x[/quote]')).toBe('<blockquote author="&quot;Bob">hi<br/>&quot;]x</blockquote>');
+	});
+
+	// The quote closing the value comes before the first ], so a later "] on the line must not stretch the tag to it
+	it('end the tag at its first ] when the value closed before it without a clean break', () => {
+		for (const sanitizeHtml of [true, false]) {
+			const parser = new yabbc({ sanitizeHtml });
+			expect(parser.parse('[quote="Bob" ]He said [b]hi[/b] then [url="https://example.com"]y[/url][/quote]')).toBe('<blockquote author="Bob">He said <strong>hi</strong> then <a href="https://example.com">y</a></blockquote>');
+			expect(capture('[item="Bob" pinned]x [url=\'https://example.com\']y[/url]', { sanitizeHtml })).toEqual(['Bob', { pinned: true }]);
+		}
+	});
+
+	it('let bare words between two key=value words join the first value, as SMF writes names', () => {
+		expect(capture('[item author=John Smith link=msg=12 date=3]')).toEqual(['John Smith', { author: 'John Smith', link: 'msg=12', date: '3' }]);
+		expect(capture('[item lang=js skip-lint]')).toEqual(['js', { 'lang': 'js', 'skip-lint': true }]);
+		expect(capture('[item skip-lint lang=js]')).toEqual(['js', { 'skip-lint': true, 'lang': 'js' }]);
+	});
+});
+
+describe('Forum quote formats', () => {
+	it.each([
+		['phpBB', '[quote="John Doe" post_id=1 time=2 user_id=3]', 'John Doe'],
+		['phpBB, name without spaces', '[quote=B4dW0lf post_id=8 time=1736080014 user_id=62]', 'B4dW0lf'],
+		['XenForo', '[QUOTE="bjf, post: 9611, member: 135"]', 'bjf'],
+		['Discourse', '[quote="TakeWalker, post:2, topic:30056, full:true"]', 'TakeWalker'],
+		['vBulletin', '[QUOTE=Little Hunter;200016]', 'Little Hunter'],
+		['vBulletin 5', '[QUOTE=Little Hunter;n200016]', 'Little Hunter'],
+		['vBulletin, quoted name', '[QUOTE="King Of Kings";172380]', 'King Of Kings'],
+		['SMF', '[quote author=John Smith link=msg=12 date=1456506357]', 'John Smith'],
+		['MyBB', '[quote=\'Name\' pid=\'12\' dateline=\'1700000000\']', 'Name'],
+	])('shows just the name for %s', (_engine, tag, author) => {
+		expect(new yabbc().parse(`${tag}hi[/quote]`)).toBe(`<blockquote author="${author}">hi</blockquote>`);
+	});
+
+	it.each([
+		['vBulletin, quoted name', '[QUOTE="King Of Kings";172380]', 'King Of Kings'],
+		['XenForo', '[QUOTE="bjf, post: 9611, member: 135"]', 'bjf'],
+	])('keeps the rest of the line for %s when a quoted value follows', (_engine, tag, author) => {
+		expect(new yabbc().parse(`${tag}hi[/quote] see [url="https://example.com"]this[/url]`)).toBe(`<blockquote author="${author}">hi</blockquote> see <a href="https://example.com">this</a>`);
+	});
+});
+
+describe('Numbered lists', () => {
+	it('render [list=1], [list=a] and the like as ordered lists', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[list=1][*]a[/list][list=a][*]b[/list][list=I][*]c[/list]')).toBe('<ol type="1"><li>a</li></ol><ol type="a"><li>b</li></ol><ol type="I"><li>c</li></ol>');
+		expect(parser.parse('[list=disc][*]d[/list]')).toBe('<ul><li>d</li></ul>');
+	});
+});
+
+describe('Escaping helpers', () => {
+	it('make custom tags safe without escaping text twice', () => {
+		for (const sanitizeHtml of [true, false]) {
+			const parser = new yabbc({ sanitizeHtml });
+			parser.registerTag('link', {
+				type: 'replace',
+				open: attr => `<a href="${parser.sanitizeUrl(attr) ?? '#'}" title="${parser.escapeHtml(attr)}">`,
+				close: '</a>',
+			});
+			expect(parser.parse('[link=https://example.com/?a=1&b="2"]x[/link]')).toBe('<a href="https://example.com/?a=1&amp;b=&quot;2&quot;" title="https://example.com/?a=1&amp;b=&quot;2&quot;">x</a>');
+			expect(parser.parse('[link=javascript:alert(1)]x[/link]')).toBe('<a href="#" title="javascript:alert(1)">x</a>');
+		}
+	});
+
+	it('respect allowedSchemes', () => {
+		const parser = new yabbc({ allowedSchemes: ['https'] });
+		expect(parser.sanitizeUrl('http://example.com')).toBeUndefined();
+		expect(parser.sanitizeUrl('https://example.com')).toBe('https://example.com');
+		expect(parser.sanitizeUrl('/relative')).toBe('/relative');
+	});
+});
+
 describe('Benchmark cases', () => {
 	it.each(benchCases)('$name renders the expected HTML', ({ input, expected, chOnly }) => {
 		const parser = new yabbc();
@@ -863,6 +1118,14 @@ describe('Linear time', () => {
 		['unclosed list items', `[list]${'[*] item\n'.repeat(50000)}[/list]`],
 		['images', '[img]https://example.com/a.png[/img]'.repeat(50000)],
 		['case variants of one unclosed tag', caseVariants],
+		['quoted values that never close', '[quote="a]'.repeat(50000)],
+		['quoted values holding ]', '[quote="a]b"]x'.repeat(50000)],
+		['apostrophes between tags', '[b]it\'s[/b] [i=\'x]'.repeat(50000)],
+		['a long run of spaces before an =', `[quote=b${' '.repeat(200000)}=]x[/quote]`],
+		['a long run of spaces after a quoted value', `[quote="a]"${' '.repeat(200000)}b]x[/quote]`],
+		['nested url tags linking to their text', `${'[url]'.repeat(50000)}&x${'[/url]'.repeat(50000)}`],
+		['nested url tags that each start like a URL', `${'[url]a:'.repeat(50000)}${'[/url]'.repeat(50000)}`],
+		['quoted values closed before a ] with a "] later on the line', '[quote="a" ]x [b="y"]z'.repeat(50000)],
 	];
 
 	it.each(inputs)('parses %s without slowing down as they grow', (_name, input) => {

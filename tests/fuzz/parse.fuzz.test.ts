@@ -130,8 +130,12 @@ interface Rendered {
 	html: string;
 }
 
+// Tags in staticTags that drop the newlines beside them when newlines are converted
+const blockTag = /\[\/?(?:h1|h6|list|olist)\]/;
+
+// Rendered with newlines kept, since which newlines block tags drop is covered by the unit tests
 const plainText = fc.constantFrom('', 'a', 'some text', ' ', '\n', 'x\ny').map((value): Rendered => {
-	return { bbcode: value, html: value.replaceAll('\n', '<br/>') };
+	return { bbcode: value, html: value };
 });
 
 // Properly nested documents, paired with the HTML they must become
@@ -176,7 +180,22 @@ describe('fuzz: parse', () => {
 	it('renders every tag of a properly nested document', () => {
 		fc.assert(
 			fc.property(nestedDocument, ({ bbcode: source, html }) => {
-				expect(new yabbc().parse(source)).toBe(html);
+				expect(new yabbc({ newline: false }).parse(source)).toBe(html);
+			}),
+			fuzzParams,
+		);
+	});
+
+	it('converts newlines in a properly nested document, dropping only those beside block tags', () => {
+		fc.assert(
+			fc.property(nestedDocument, ({ bbcode: source, html }) => {
+				const output = new yabbc().parse(source);
+				if (blockTag.test(source)) {
+					expect(output.replaceAll('<br/>', '')).toBe(html.replaceAll('\n', ''));
+					expect(output.split('<br/>').length).toBeLessThanOrEqual(html.split('\n').length);
+				} else {
+					expect(output).toBe(html.replaceAll('\n', '<br/>'));
+				}
 			}),
 			fuzzParams,
 		);
