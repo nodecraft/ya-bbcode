@@ -370,14 +370,19 @@ class yabbcode {
 		// Adaptive threshold: use optimized path for large documents (>50 tags)
 		// Only optimize when all tags are replace-type and none have autoClose
 		if (tagsMap.length > 50) {
-			// Check if we have any content, ignore type, or autoClose tags
-			const hasSpecialTypes = tagsMap.some((tag) => {
+			// Check if we have any content, ignore type, or autoClose tags.
+			// Must recurse into children: special tags like [*] (autoClose) or [img]
+			// (content) are usually nested, so a top-level-only check would miss them
+			// and incorrectly take the optimized path that ignores those behaviors.
+			const hasSpecialType = (tag: TagItem): boolean => {
 				const module = this.tags[tag.module];
-				if (!module) { return false; }
-				if (module.type === 'content' || module.type === 'ignore') { return true; }
-				if (module.type === 'replace' && (module as ReplaceTag).autoClose) { return true; }
-				return false;
-			});
+				if (module) {
+					if (module.type === 'content' || module.type === 'ignore') { return true; }
+					if (module.type === 'replace' && (module as ReplaceTag).autoClose) { return true; }
+				}
+				return tag.children.some(child => hasSpecialType(child));
+			};
+			const hasSpecialTypes = tagsMap.some(tag => hasSpecialType(tag));
 
 			// If only replace-type tags without autoClose, use optimized single-pass approach
 			if (!hasSpecialTypes) {
@@ -427,12 +432,16 @@ class yabbcode {
 						autoClose = autoClose(tag.attr, tag.attrs);
 					}
 
-					// Find insertion point: before next sibling or parent close
+					// Close before the next sibling of the same tag (e.g. the next [*]), not before inline tags like [b] inside this item
 					let insertBefore: string | undefined;
-					const nextTag = tagsMap[i + 1];
-					if (nextTag) {
-						insertBefore = '[TAG-' + nextTag.index + ']';
-					} else if (parentClosingTagIndex !== undefined) {
+					for (let siblingIndex = i + 1; siblingIndex < tagsMap.length; siblingIndex++) {
+						const sibling = tagsMap[siblingIndex];
+						if (sibling?.module === tag.module) {
+							insertBefore = '[TAG-' + sibling.index + ']';
+							break;
+						}
+					}
+					if (insertBefore === undefined && parentClosingTagIndex !== undefined) {
 						insertBefore = '[TAG-' + parentClosingTagIndex + ']';
 					}
 
@@ -449,9 +458,13 @@ class yabbcode {
 				if (close && tag.closing) {
 					content = content.replace('[TAG-' + tag.closing.index + ']', close);
 				}
-
 			} else if (module.type === 'content') {
 				content = this.contentModules.content(tag, module as ContentTag, content);
+				// Recurse children so nested tags inside content that re-emits its
+				// inner content (e.g. a custom [box] wrapper) are still resolved.
+				if (tag.children.length > 0) {
+					content = this.#contentLoop(tag.children, content);
+				}
 			} else if (module.type === 'ignore') {
 				content = this.contentModules.ignore(tag, module as IgnoreTag, content);
 			}

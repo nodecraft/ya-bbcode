@@ -375,6 +375,33 @@ describe('ya-bbcode', () => {
 		// autoClose should insert </div> before next sibling and before parent close
 		expect(parser.parse('[container][item]one[item]two[/container]')).toBe('<div class="container"><div class="item">one</div><div class="item">two</div></div>');
 	});
+	it('autoClose works in large documents (>50 top-level tags)', () => {
+		const parser = new yabbc();
+		// >50 top-level replace tags would otherwise trigger the optimized path,
+		// which must not skip autoClose on nested [*] items.
+		let input = '';
+		for (let i = 0; i < 60; i++) {
+			input += '[b]x[/b]';
+		}
+		input += '[list][*]a[*]b[/list]';
+		const result = parser.parse(input);
+		expect(result).toContain('<ul><li>a</li><li>b</li></ul>');
+	});
+	it('autoClose list items wrap inline tags inside them', () => {
+		const parser = new yabbc();
+		expect(parser.parse('[list][*]Item with [b]bold[/b] text[*]Next[/list]')).toBe('<ul><li>Item with <strong>bold</strong> text</li><li>Next</li></ul>');
+		expect(parser.parse('[list][*][url=https://a.com]a[/url][*]b [i]c[/i][/list]')).toBe('<ul><li><a href="https://a.com">a</a></li><li>b <i>c</i></li></ul>');
+	});
+	it('content tag preserves nested children', () => {
+		const parser = new yabbc();
+		// A content tag whose replace re-emits its inner content should still
+		// resolve nested formatting tags within it.
+		parser.registerTag('box', {
+			type: 'content',
+			replace: (_attr, content) => `<div>${content}</div>`,
+		});
+		expect(parser.parse('[box]hello [b]world[/b][/box]')).toBe('<div>hello <strong>world</strong></div>');
+	});
 	it('List items without explicit closing tags (Steam BBCode format)', () => {
 		const parser = new yabbc();
 		// This tests the fix for issue #214 - auto-closing list items

@@ -79,7 +79,7 @@ describe('Type exports', () => {
 			type: 'replace',
 			open: (_attr: string, attrs: TagAttributes) => `<li class="${attrs.class || ''}">`,
 			close: null,
-			autoClose: (_attr: string, _attrs: TagAttributes) => '</li>',
+			autoClose: (_attr: string, attrs: TagAttributes) => (attrs.div ? '</div>' : '</li>'),
 		};
 		expectTypeOf(autoCloseWithAttrsTag).toEqualTypeOf<ReplaceTag>();
 	});
