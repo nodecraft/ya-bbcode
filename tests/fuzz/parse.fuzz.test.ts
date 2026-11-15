@@ -93,7 +93,7 @@ const bbcode = fc.array(
 	{ maxLength: 60 },
 ).map(parts => parts.join(''));
 
-// More than 50 top-level replace tags takes the separate optimized code path
+// Long runs of matched pairs, the shape large real posts take
 const largeDocument = fc.array(
 	fc.tuple(fc.constantFrom('b', 'i', 'url', 'quote', 'x'), value, piece),
 	{ minLength: 51, maxLength: 70 },
@@ -111,6 +111,53 @@ function expectSafe(output: string, source: string): void {
 	expect(findUnsafeOutput(output), `input: ${JSON.stringify(source)}\noutput: ${JSON.stringify(output)}`).toEqual([]);
 }
 
+// Tags whose HTML is fixed, so a nested document can be rendered here without going through the parser
+const staticTags: Record<string, [open: string, close: string]> = {
+	b: ['<strong>', '</strong>'],
+	i: ['<i>', '</i>'],
+	u: ['<u>', '</u>'],
+	h1: ['<h1>', '</h1>'],
+	h6: ['<h6>', '</h6>'],
+	code: ['<code>', '</code>'],
+	strike: ['<span class="yabbcode-strike">', '</span>'],
+	spoiler: ['<span class="yabbcode-spoiler">', '</span>'],
+	list: ['<ul>', '</ul>'],
+	olist: ['<ol>', '</ol>'],
+};
+
+interface Rendered {
+	bbcode: string;
+	html: string;
+}
+
+const plainText = fc.constantFrom('', 'a', 'some text', ' ', '\n', 'x\ny').map((value): Rendered => {
+	return { bbcode: value, html: value.replaceAll('\n', '<br/>') };
+});
+
+// Properly nested documents, paired with the HTML they must become
+const { nested } = fc.letrec<{ nested: Rendered; }>((tie) => {
+	return {
+		nested: fc.oneof(
+			{ maxDepth: 6 },
+			plainText,
+			fc.tuple(fc.constantFrom(...Object.keys(staticTags)), fc.array(tie('nested'), { maxLength: 4 })).map(([name, children]): Rendered => {
+				const [open, close] = staticTags[name] ?? ['', ''];
+				return {
+					bbcode: `[${name}]${children.map(child => child.bbcode).join('')}[/${name}]`,
+					html: open + children.map(child => child.html).join('') + close,
+				};
+			}),
+		),
+	};
+});
+
+const nestedDocument = fc.array(nested, { maxLength: 6 }).map((items): Rendered => {
+	return {
+		bbcode: items.map(item => item.bbcode).join(''),
+		html: items.map(item => item.html).join(''),
+	};
+});
+
 describe('fuzz: parse', () => {
 	it('never throws, is deterministic and leaves Object.prototype alone', () => {
 		const baseline = Object.getOwnPropertyNames(Object.prototype).join(',');
@@ -121,6 +168,15 @@ describe('fuzz: parse', () => {
 				expect(typeof output).toBe('string');
 				expect(parser.parse(source)).toBe(output);
 				expect(Object.getOwnPropertyNames(Object.prototype).join(',')).toBe(baseline);
+			}),
+			fuzzParams,
+		);
+	});
+
+	it('renders every tag of a properly nested document', () => {
+		fc.assert(
+			fc.property(nestedDocument, ({ bbcode: source, html }) => {
+				expect(new yabbc().parse(source)).toBe(html);
 			}),
 			fuzzParams,
 		);
